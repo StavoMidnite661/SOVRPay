@@ -22,30 +22,50 @@ export function Navigation() {
               </div>
               <span className="text-xl font-bold">SOVR Pay</span>
             </Link>
-            <div className="hidden md:flex space-x-8 ml-8">
+            <div className="hidden lg:flex space-x-6 ml-8">
               <button 
                 onClick={() => scrollToSection('overview')}
-                className="text-muted-foreground hover:text-foreground transition-colors"
+                className="text-muted-foreground hover:text-foreground transition-colors text-sm"
               >
                 Overview
               </button>
-              <Link href="/integration">
-                <button className="text-muted-foreground hover:text-foreground transition-colors">
-                  Integration
+              <Link href="/ecosystem-demo">
+                <button className="text-muted-foreground hover:text-foreground transition-colors text-sm">
+                  Live Demo
+                </button>
+              </Link>
+              <Link href="/rwa-tokenization">
+                <button className="text-muted-foreground hover:text-foreground transition-colors text-sm">
+                  RWA Tokenization
+                </button>
+              </Link>
+              <Link href="/integration-hub">
+                <button className="text-muted-foreground hover:text-foreground transition-colors text-sm">
+                  Integration Hub
                 </button>
               </Link>
               <Link href="/api-testing">
-                <button className="text-muted-foreground hover:text-foreground transition-colors">
+                <button className="text-muted-foreground hover:text-foreground transition-colors text-sm">
                   API Testing
                 </button>
               </Link>
               <Link href="/smart-contracts">
-                <button className="text-muted-foreground hover:text-foreground transition-colors">
+                <button className="text-muted-foreground hover:text-foreground transition-colors text-sm">
                   Smart Contracts
                 </button>
               </Link>
+              <Link href="/defi-protocols">
+                <button className="text-muted-foreground hover:text-foreground transition-colors text-sm">
+                  DeFi Protocols
+                </button>
+              </Link>
+              <Link href="/banking-compliance">
+                <button className="text-muted-foreground hover:text-foreground transition-colors text-sm">
+                  Banking & Compliance
+                </button>
+              </Link>
               <Link href="/monitoring">
-                <button className="text-muted-foreground hover:text-foreground transition-colors">
+                <button className="text-muted-foreground hover:text-foreground transition-colors text-sm">
                   Monitoring
                 </button>
               </Link>

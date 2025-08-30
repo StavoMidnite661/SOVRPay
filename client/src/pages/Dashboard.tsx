@@ -35,11 +35,11 @@ export function Dashboard() {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
-              Complete Payment Ecosystem
+              SOVR Pay Network Suite
             </h1>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
-              Experience the full SOVR Pay ecosystem with live demos, interactive tutorials, and real-time testing. 
-              Build, test, and deploy payment solutions with confidence.
+              Complete financial technology ecosystem with RWA tokenization, DeFi protocols, banking compliance, 
+              and seamless integration. Experience the future of digital finance.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button 

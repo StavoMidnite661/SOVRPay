@@ -1,22 +1,19 @@
 import { Route, Switch } from 'wouter';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { Navigation } from '@/components/Navigation';
 import { Dashboard } from '@/pages/Dashboard';
+import { EcosystemDemo } from '@/pages/EcosystemDemo';
+import { RWATokenization } from '@/pages/RWATokenization';
+import { IntegrationHub } from '@/pages/IntegrationHub';
 import { Integration } from '@/pages/Integration';
 import { ApiTesting } from '@/pages/ApiTesting';
 import { SmartContracts } from '@/pages/SmartContracts';
+import { DeFiProtocols } from '@/pages/DeFiProtocols';
+import { BankingCompliance } from '@/pages/BankingCompliance';
 import { Monitoring } from '@/pages/Monitoring';
 import NotFound from '@/pages/not-found';
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      retry: 1,
-    },
-  },
-});
+import { queryClient } from '@/lib/queryClient';
 
 function App() {
   return (
@@ -27,9 +24,14 @@ function App() {
         <main>
           <Switch>
             <Route path="/" component={Dashboard} />
+            <Route path="/ecosystem-demo" component={EcosystemDemo} />
+            <Route path="/rwa-tokenization" component={RWATokenization} />
+            <Route path="/integration-hub" component={IntegrationHub} />
             <Route path="/integration" component={Integration} />
             <Route path="/api-testing" component={ApiTesting} />
             <Route path="/smart-contracts" component={SmartContracts} />
+            <Route path="/defi-protocols" component={DeFiProtocols} />
+            <Route path="/banking-compliance" component={BankingCompliance} />
             <Route path="/monitoring" component={Monitoring} />
             <Route component={NotFound} />
           </Switch>
