@@ -1,6 +1,7 @@
 import express from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
+import path from 'path';
 import { storage } from './storage';
 import { createPaymentSchema, createSmartContractSchema } from '@shared/schema';
 
@@ -53,7 +54,8 @@ function broadcast(message: any) {
 router.post('/api/payments', async (req, res) => {
   try {
     const validatedData = createPaymentSchema.parse(req.body);
-    const payment = await storage.createPayment(validatedData);
+    const paymentData = { ...validatedData, status: 'pending' as const };
+    const payment = await storage.createPayment(paymentData);
     
     // Simulate payment processing
     setTimeout(async () => {
@@ -98,7 +100,8 @@ router.get('/api/payments', async (req, res) => {
 router.post('/api/contracts', async (req, res) => {
   try {
     const validatedData = createSmartContractSchema.parse(req.body);
-    const contract = await storage.createSmartContract(validatedData);
+    const contractData = { ...validatedData, status: 'deploying' as const };
+    const contract = await storage.createSmartContract(contractData);
     
     broadcast({ type: 'contract_deployment_started', data: contract });
     res.json(contract);
@@ -214,6 +217,27 @@ router.post('/api/test', async (req, res) => {
     });
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid request' });
+  }
+});
+
+// Chrome Extension Download Route
+router.get('/api/download-extension', (req, res) => {
+  try {
+    const file = path.join(process.cwd(), 'public', 'sovr-extension.zip');
+    
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', 'attachment; filename="sovr-pay-extension.zip"');
+    res.setHeader('Content-Length', require('fs').statSync(file).size);
+    
+    res.download(file, 'sovr-pay-extension.zip', (err) => {
+      if (err) {
+        console.error('Download error:', err);
+        res.status(500).send('Error downloading extension');
+      }
+    });
+  } catch (error) {
+    console.error('Extension download error:', error);
+    res.status(404).json({ error: 'Extension file not found' });
   }
 });
 

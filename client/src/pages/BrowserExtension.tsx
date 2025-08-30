@@ -14,26 +14,43 @@ export function BrowserExtension() {
   const [showPaymentOverlay, setShowPaymentOverlay] = useState(false);
   const [selectedTokens, setSelectedTokens] = useState({ rwa: 60, sovr: 30, card: 10 });
 
-  const downloadExtension = () => {
-    // Trigger download of the extension files
-    const link = document.createElement('a');
-    link.href = '/sovr-extension.zip';
-    link.download = 'sovr-pay-extension.zip';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // Show installation instructions
-    alert(`📦 Extension downloaded! 
+  const downloadExtension = async () => {
+    try {
+      // Use the API endpoint for reliable download
+      const response = await fetch('/api/download-extension');
+      
+      if (!response.ok) {
+        throw new Error('Download failed');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'sovr-pay-extension.zip';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      // Show installation instructions
+      alert(`📦 Extension downloaded successfully! 
 
 To install:
-1. Open Chrome and go to chrome://extensions/
-2. Enable "Developer mode" (top right toggle)
-3. Click "Load unpacked" 
-4. Select the extracted sovr-extension folder
-5. The SOVR Pay extension will appear in your toolbar!
+1. Extract the ZIP file to a folder on your computer
+2. Open Chrome and go to chrome://extensions/
+3. Enable "Developer mode" (toggle in top right)
+4. Click "Load unpacked extension"
+5. Select the extracted "sovr-extension" folder
+6. The SOVR Pay extension will appear in your toolbar!
 
-Then visit any shopping site and watch the magic happen! ✨`);
+Then visit any shopping site (Amazon, Walmart, etc.) and watch the magic happen! ✨
+
+The extension will automatically detect checkout forms and inject SOVR Pay options.`);
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('❌ Download failed. Please try again or contact support.');
+    }
   };
 
   // Simulate form detection
