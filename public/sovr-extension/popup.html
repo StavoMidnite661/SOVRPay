@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SOVR Pay</title>
+  <link rel="stylesheet" href="popup-styles.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <div class="header">
+      <div class="logo">
+        <div class="logo-icon">S</div>
+        <h1>SOVR Pay</h1>
+      </div>
+      <div class="status" id="status">
+        <span class="status-indicator" id="statusIndicator"></span>
+        <span id="statusText">Active</span>
+      </div>
+    </div>
+
+    <!-- Wallet Balance -->
+    <div class="wallet-section">
+      <h3>Your Wallet</h3>
+      <div class="balance-grid">
+        <div class="balance-item">
+          <div class="balance-label">RWA Tokens</div>
+          <div class="balance-value" id="rwaBalance">$2,588.75</div>
+        </div>
+        <div class="balance-item">
+          <div class="balance-label">SOVR Credits</div>
+          <div class="balance-value" id="sovrBalance">$15,420.80</div>
+        </div>
+        <div class="balance-item">
+          <div class="balance-label">Staking Rewards</div>
+          <div class="balance-value" id="stakingBalance">$245.60</div>
+        </div>
+      </div>
+      <div class="total-balance">
+        <span>Total Available: </span>
+        <span id="totalBalance">$18,255.15</span>
+      </div>
+    </div>
+
+    <!-- Payment Mix Settings -->
+    <div class="settings-section">
+      <h3>Default Payment Mix</h3>
+      <div class="mix-controls">
+        <div class="mix-item">
+          <label>RWA Tokens</label>
+          <div class="slider-container">
+            <input type="range" id="rwaSlider" min="0" max="100" value="60">
+            <span id="rwaPercent">60%</span>
+          </div>
+        </div>
+        <div class="mix-item">
+          <label>SOVR Credits</label>
+          <div class="slider-container">
+            <input type="range" id="sovrSlider" min="0" max="100" value="30">
+            <span id="sovrPercent">30%</span>
+          </div>
+        </div>
+        <div class="mix-item">
+          <label>Credit Card</label>
+          <div class="slider-container">
+            <input type="range" id="cardSlider" min="0" max="100" value="10">
+            <span id="cardPercent">10%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="activity-section">
+      <h3>Recent Activity</h3>
+      <div id="recentTransactions">
+        <div class="transaction-item">
+          <div class="transaction-info">
+            <div class="merchant">Amazon</div>
+            <div class="amount">$49.99</div>
+          </div>
+          <div class="transaction-status">✅ Completed</div>
+        </div>
+        <div class="transaction-item">
+          <div class="transaction-info">
+            <div class="merchant">Starbucks</div>
+            <div class="amount">$8.45</div>
+          </div>
+          <div class="transaction-status">✅ Completed</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="actions">
+      <button id="toggleExtension" class="primary-btn">
+        <span id="toggleText">Disable Extension</span>
+      </button>
+      <button id="openSettings" class="secondary-btn">Settings</button>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div class="links">
+        <a href="#" id="viewDashboard">View Dashboard</a>
+        <a href="#" id="support">Support</a>
+      </div>
+      <div class="version">v1.0.0</div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

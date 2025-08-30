@@ -14,6 +14,28 @@ export function BrowserExtension() {
   const [showPaymentOverlay, setShowPaymentOverlay] = useState(false);
   const [selectedTokens, setSelectedTokens] = useState({ rwa: 60, sovr: 30, card: 10 });
 
+  const downloadExtension = () => {
+    // Trigger download of the extension files
+    const link = document.createElement('a');
+    link.href = '/sovr-extension.zip';
+    link.download = 'sovr-pay-extension.zip';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Show installation instructions
+    alert(`📦 Extension downloaded! 
+
+To install:
+1. Open Chrome and go to chrome://extensions/
+2. Enable "Developer mode" (top right toggle)
+3. Click "Load unpacked" 
+4. Select the extracted sovr-extension folder
+5. The SOVR Pay extension will appear in your toolbar!
+
+Then visit any shopping site and watch the magic happen! ✨`);
+  };
+
   // Simulate form detection
   useEffect(() => {
     if (isExtensionActive) {
@@ -476,13 +498,17 @@ const processPayment = async (formData) => {
                   </div>
 
                   <div className="flex space-x-3">
-                    <Button className="flex-1">
-                      <i className="fab fa-chrome mr-2"></i>
-                      Install for Chrome
+                    <Button 
+                      className="flex-1"
+                      onClick={downloadExtension}
+                      data-testid="download-chrome-extension"
+                    >
+                      <i className="fas fa-download mr-2"></i>
+                      Download for Chrome
                     </Button>
-                    <Button variant="outline" className="flex-1">
+                    <Button variant="outline" className="flex-1" disabled>
                       <i className="fab fa-firefox mr-2"></i>
-                      Firefox
+                      Firefox (Soon)
                     </Button>
                   </div>
 
