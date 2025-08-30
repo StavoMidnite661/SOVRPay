@@ -34,6 +34,11 @@ export function Navigation() {
                   Live Demo
                 </button>
               </Link>
+              <Link href="/real-world-shopping">
+                <button className="text-primary hover:text-primary/80 transition-colors text-sm font-medium">
+                  🛒 Live Shopping
+                </button>
+              </Link>
               <Link href="/rwa-tokenization">
                 <button className="text-muted-foreground hover:text-foreground transition-colors text-sm">
                   RWA Tokenization
