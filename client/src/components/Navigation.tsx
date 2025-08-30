@@ -39,6 +39,11 @@ export function Navigation() {
                   🛒 Live Shopping
                 </button>
               </Link>
+              <Link href="/browser-extension">
+                <button className="text-accent hover:text-accent/80 transition-colors text-sm font-medium">
+                  🔌 Extension
+                </button>
+              </Link>
               <Link href="/rwa-tokenization">
                 <button className="text-muted-foreground hover:text-foreground transition-colors text-sm">
                   RWA Tokenization

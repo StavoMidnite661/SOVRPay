@@ -5,6 +5,7 @@ import { Navigation } from '@/components/Navigation';
 import { Dashboard } from '@/pages/Dashboard';
 import { EcosystemDemo } from '@/pages/EcosystemDemo';
 import { RealWorldShopping } from '@/pages/RealWorldShopping';
+import { BrowserExtension } from '@/pages/BrowserExtension';
 import { RWATokenization } from '@/pages/RWATokenization';
 import { IntegrationHub } from '@/pages/IntegrationHub';
 import { Integration } from '@/pages/Integration';
@@ -27,6 +28,7 @@ function App() {
             <Route path="/" component={Dashboard} />
             <Route path="/ecosystem-demo" component={EcosystemDemo} />
             <Route path="/real-world-shopping" component={RealWorldShopping} />
+            <Route path="/browser-extension" component={BrowserExtension} />
             <Route path="/rwa-tokenization" component={RWATokenization} />
             <Route path="/integration-hub" component={IntegrationHub} />
             <Route path="/integration" component={Integration} />
