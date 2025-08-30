@@ -1,0 +1,192 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+/**
+ * SOVRCreditLedger — Mirror of bank balance sheet logic in Solidity
+ * ---------------------------------------------------------------
+ * - ERC20 liability (SOVR balances) + on-chain receivable assets (CreditAgreements)
+ * - Mint/burn MUST reference a receivable (like a bank's asset backing a deposit)
+ * - Idempotent SRN for off-chain processing
+ * - ISO20022 base64 envelope emission (for straight-through processing)
+ * - Role-gated admin with pause & reentrancy protection
+ */
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+
+contract SOVRCreditLedger is ERC20, AccessControl, Pausable, ReentrancyGuard {
+    using EnumerableSet for EnumerableSet.Bytes32Set;
+
+    // ----------------------- Roles -----------------------
+    bytes32 public constant TREASURER_ROLE = keccak256("TREASURER_ROLE");
+    bytes32 public constant AUDITOR_ROLE   = keccak256("AUDITOR_ROLE");
+    bytes32 public constant ISSUER_ROLE    = keccak256("ISSUER_ROLE");
+
+    // ----------------------- Types -----------------------
+    struct CreditAgreement {
+        address obligor;          // who owes the trust (like bank loan customer)
+        uint256 principal;        // face amount in SOVR units (18 decimals)
+        uint256 interestRateBps;  // optional policy; informational
+        uint256 createdAt;        // block.timestamp
+        uint256 maturityDate;     // unix time; 0 if open-ended
+        bytes32 collateralRef;    // hash to doc/IPFS/trust instrument
+        bool active;              // lifecycle flag
+        uint256 principalDrawn;   // amount already issued as deposits (minted to beneficiary)
+    }
+
+    // agreementId => data
+    mapping(bytes32 => CreditAgreement) private agreements;
+    // address => set of agreementIds the address is obligor of
+    mapping(address => EnumerableSet.Bytes32Set) private byObligor;
+
+    // SRN (idempotency keys) consumed
+    mapping(bytes32 => bool) public srnUsed;
+
+    // ----------------------- Events -----------------------
+    event AgreementCreated(bytes32 indexed agreementId, address indexed obligor, uint256 principal, uint256 maturityDate, bytes32 collateralRef);
+    event AgreementUpdated(bytes32 indexed agreementId, uint256 principal, uint256 interestRateBps, uint256 maturityDate, bytes32 collateralRef, bool active);
+    event MintAgainstAgreement(bytes32 indexed agreementId, address indexed beneficiary, uint256 amount, bytes32 srn);
+    event BurnForRedemption(address indexed from, uint256 amount, string reason, bytes32 srn);
+    event ISO20022Packed(bytes32 indexed srn, string b64xml);
+
+    constructor(string memory name_, string memory symbol_) ERC20(name_, symbol_) {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(TREASURER_ROLE, msg.sender);
+        _grantRole(AUDITOR_ROLE, msg.sender);
+        _grantRole(ISSUER_ROLE, msg.sender);
+    }
+
+    // ----------------------- Modifiers & Helpers -----------------------
+    modifier onlyAdmin() { require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "not admin"); _; }
+    modifier onlyIssuer() { require(hasRole(ISSUER_ROLE, msg.sender), "not issuer"); _; }
+    modifier onlyTreasurer() { require(hasRole(TREASURER_ROLE, msg.sender), "not treasurer"); _; }
+
+    function pause() external onlyAdmin { _pause(); }
+    function unpause() external onlyAdmin { _unpause(); }
+
+    function _srn(bytes memory blob) internal view returns (bytes32) {
+        return keccak256(abi.encodePacked(address(this), block.chainid, blob));
+    }
+
+    // ----------------------- Read API -----------------------
+    function getAgreement(bytes32 agreementId) external view returns (CreditAgreement memory) {
+        return agreements[agreementId];
+    }
+
+    function agreementsOf(address obligor) external view returns (bytes32[] memory ids) {
+        ids = byObligor[obligor].values();
+    }
+
+    // Aggregate receivable for an obligor (like bank's loan receivable total)
+    function receivableOf(address obligor) external view returns (uint256 principalTotal, uint256 drawnTotal) {
+        bytes32[] memory ids = byObligor[obligor].values();
+        for (uint256 i = 0; i < ids.length; i++) {
+            CreditAgreement storage a = agreements[ids[i]];
+            if (a.active) {
+                principalTotal += a.principal;
+                drawnTotal += a.principalDrawn;
+            }
+        }
+    }
+
+    // ----------------------- Agreement Lifecycle -----------------------
+    function createAgreement(
+        address obligor,
+        uint256 principal,
+        uint256 interestRateBps,
+        uint256 maturityDate,
+        bytes32 collateralRef
+    ) external onlyIssuer whenNotPaused returns (bytes32 agreementId) {
+        require(obligor != address(0), "bad obligor");
+        require(principal > 0, "principal=0");
+        agreementId = keccak256(abi.encodePacked(obligor, principal, maturityDate, collateralRef, block.number, block.timestamp));
+        require(!agreements[agreementId].active, "exists");
+        agreements[agreementId] = CreditAgreement({
+            obligor: obligor,
+            principal: principal,
+            interestRateBps: interestRateBps,
+            createdAt: block.timestamp,
+            maturityDate: maturityDate,
+            collateralRef: collateralRef,
+            active: true,
+            principalDrawn: 0
+        });
+        byObligor[obligor].add(agreementId);
+        emit AgreementCreated(agreementId, obligor, principal, maturityDate, collateralRef);
+    }
+
+    function updateAgreement(
+        bytes32 agreementId,
+        uint256 newPrincipal,
+        uint256 newRateBps,
+        uint256 newMaturity,
+        bytes32 newCollateralRef,
+        bool newActive
+    ) external onlyIssuer whenNotPaused {
+        CreditAgreement storage a = agreements[agreementId];
+        require(a.obligor != address(0), "no agreement");
+        a.principal = newPrincipal;
+        a.interestRateBps = newRateBps;
+        a.maturityDate = newMaturity;
+        a.collateralRef = newCollateralRef;
+        a.active = newActive;
+        emit AgreementUpdated(agreementId, a.principal, a.interestRateBps, a.maturityDate, a.collateralRef, a.active);
+    }
+
+    // ----------------------- Mint/Burn with SRN -----------------------
+    /**
+     * Mint SOVR tokens to a beneficiary against an active receivable (like a bank crediting a deposit
+     * when they hold your promissory note). Draw cannot exceed principal. Uses SRN idempotency.
+     */
+    function mintAgainstAgreement(
+        bytes32 agreementId,
+        address beneficiary,
+        uint256 amount,
+        bytes32 clientNonce // optional caller-provided salt to make SRN predictable cross-systems
+    ) external onlyTreasurer whenNotPaused nonReentrant {
+        CreditAgreement storage a = agreements[agreementId];
+        require(a.active, "inactive");
+        require(beneficiary != address(0), "bad to");
+        require(amount > 0, "amount=0");
+        require(a.principalDrawn + amount <= a.principal, "exceeds principal");
+
+        bytes32 srn = _srn(abi.encodePacked("MINT", agreementId, beneficiary, amount, clientNonce));
+        require(!srnUsed[srn], "srn used");
+        srnUsed[srn] = true;
+
+        a.principalDrawn += amount;
+        _mint(beneficiary, amount);
+        emit MintAgainstAgreement(agreementId, beneficiary, amount, srn);
+    }
+
+    /**
+     * Burn SOVR from sender as redemption (like paying down a deposit). Emits SRN for off-chain idempotency.
+     */
+    function burnForRedemption(uint256 amount, string calldata reason, bytes32 clientNonce)
+        external whenNotPaused nonReentrant
+    {
+        require(amount > 0, "amount=0");
+        bytes32 srn = _srn(abi.encodePacked("BURN", msg.sender, amount, clientNonce));
+        require(!srnUsed[srn], "srn used");
+        srnUsed[srn] = true;
+
+        _burn(msg.sender, amount);
+        emit BurnForRedemption(msg.sender, amount, reason, srn);
+    }
+
+    /**
+     * Optional: attach a base64-encoded ISO 20022 message to an SRN for straight-through processing.
+     */
+    function attachISO20022(bytes32 srn, string calldata b64xml) external onlyTreasurer whenNotPaused {
+        require(srnUsed[srn], "unknown srn");
+        emit ISO20022Packed(srn, b64xml);
+    }
+
+    // ----------------------- ERC20 Overrides -----------------------
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal override whenNotPaused {
+        super._beforeTokenTransfer(from, to, amount);
+    }
+}

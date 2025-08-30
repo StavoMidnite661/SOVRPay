@@ -1,0 +1,244 @@
+# SOVR RailBridge Backend (Node/Express + ethers v6)
+
+> Purpose: Glue WooCommerce → SOVR Credit Ledger (proxy) → Off‑chain rail adapters (ACH/Tango/…)
+
+---
+
+## 0) `package.json`
+```json
+{
+  "name": "sovr-railbridge",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "worker": "node worker.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "ethers": "^6.13.2",
+    "express": "^4.19.2",
+    "body-parser": "^1.20.3",
+    "crypto": "^1.0.1",
+    "dotenv": "^16.4.5",
+    "multer": "^1.4.5-lts.1"
+  }
+}
+```
+
+## 1) `.env` (example)
+```
+PORT=8080
+# RPC
+RPC_URL=https://polygon-mainnet.g.alchemy.com/v2/<KEY>
+WS_URL=wss://polygon-mainnet.g.alchemy.com/v2/<KEY>
+CHAIN_ID=137
+# Contract (proxy address)
+LEDGER_ADDR=0xYourProxyAddress
+# Roles
+TREASURER_PK=0xabc...   # wallet that has TREASURER_ROLE
+RAIL_EXECUTOR_PK=0xdef... # wallet that has RAIL_EXECUTOR_ROLE (used by worker)
+# Woo webhook secret
+WOO_SHARED_SECRET=change-me
+# Tango API
+TANGO_BASE=https://api.tangocard.com/raas/v2
+TANGO_PLATFORM_KEY=... 
+TANGO_PLATFORM_SECRET=...
+TANGO_ACCOUNT_IDENTIFIER=YOUR-ACCOUNT
+TANGO_CUSTOMER_IDENTIFIER=YOUR-CUSTOMER
+```
+
+## 2) `abi/ledger.json` (minimal ABI)
+```json
+[
+  {"inputs":[],"name":"version","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"pure","type":"function"},
+  {"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"mint","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"beneficiary","type":"address"},{"internalType":"uint256","name":"amountTokens","type":"uint256"},{"internalType":"uint256","name":"amountUsdCents","type":"uint256"},{"internalType":"bytes32","name":"rail","type":"bytes32"},{"internalType":"bytes32","name":"invoiceId","type":"bytes32"},{"internalType":"bytes32","name":"srn","type":"bytes32"},{"internalType":"string","name":"evidenceURI","type":"string"}],"name":"burnForRedemption","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"bytes32","name":"invoiceId","type":"bytes32"},{"internalType":"bytes32","name":"adapterRef","type":"bytes32"},{"internalType":"string","name":"evidenceURI","type":"string"}],"name":"markPayoutSubmitted","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"bytes32","name":"invoiceId","type":"bytes32"},{"internalType":"bytes32","name":"adapterRef","type":"bytes32"},{"internalType":"string","name":"evidenceURI","type":"string"}],"name":"markPayoutSettled","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"bytes32","name":"invoiceId","type":"bytes32"},{"internalType":"string","name":"reason","type":"string"},{"internalType":"string","name":"evidenceURI","type":"string"}],"name":"markPayoutFailed","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"invoiceId","type":"bytes32"},{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"beneficiary","type":"address"},{"indexed":false,"internalType":"uint256","name":"amountTokens","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"amountUsdCents","type":"uint256"},{"indexed":false,"internalType":"bytes32","name":"rail","type":"bytes32"},{"indexed":false,"internalType":"bytes32","name":"srn","type":"bytes32"},{"indexed":false,"internalType":"uint80","name":"oracleRoundId","type":"uint80"},{"indexed":false,"internalType":"int256","name":"oracleAnswer","type":"int256"},{"indexed":false,"internalType":"uint8","name":"oracleDecimals","type":"uint8"},{"indexed":false,"internalType":"uint256","name":"oracleTimestamp","type":"uint256"},{"indexed":false,"internalType":"string","name":"evidenceURI","type":"string"}],"name":"PayoutRequested","type":"event"}
+]
+```
+
+## 3) `server.js` — Woo webhook → burnForRedemption
+```js
+import 'dotenv/config';
+import express from 'express';
+import bodyParser from 'body-parser';
+import crypto from 'crypto';
+import { ethers } from 'ethers';
+import fs from 'fs';
+
+const app = express();
+app.use(bodyParser.json({ limit: '1mb' }));
+
+const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
+const treasurer = new ethers.Wallet(process.env.TREASURER_PK, provider);
+const ledgerAbi = JSON.parse(fs.readFileSync('./abi/ledger.json', 'utf8'));
+const ledger = new ethers.Contract(process.env.LEDGER_ADDR, ledgerAbi, treasurer);
+
+function hmacOk(req) {
+  const secret = process.env.WOO_SHARED_SECRET;
+  const sig = req.get('X-SOVR-Signature') || '';
+  const payload = JSON.stringify(req.body);
+  const calc = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(calc));
+}
+
+const b32 = (s) => ethers.id(s); // keccak256 as bytes32 id (stable)
+
+app.post('/woo/webhook', async (req, res) => {
+  try {
+    if (!hmacOk(req)) return res.status(401).json({ ok: false, error: 'bad signature' });
+
+    const { order_id, usd_cents, customer_wallet, beneficiary_eth, rail } = req.body;
+
+    // Configure token math: assume token has 18 decimals and 1 token == $1 (fixed peg) →
+    const amountUsdCents = BigInt(usd_cents);
+    const tokens18 = (amountUsdCents / 100n) * 10n ** 18n; // $X → X tokens
+
+    const invoiceId = b32(`INV:${order_id}`);
+    const srn = b32(`SRN:${order_id}:${Date.now()}`);
+
+    const from = customer_wallet || treasurer.address;       // for MVP burn from treasury
+    const beneficiary = beneficiary_eth || treasurer.address; // payout receiver on rail side
+
+    const railKey = (rail || 'ACH').toUpperCase();
+    const railBytes = ethers.encodeBytes32String(railKey).slice(0, 66); // bytes32
+
+    const tx = await ledger.burnForRedemption(
+      from,
+      beneficiary,
+      tokens18,
+      amountUsdCents,
+      railBytes,
+      invoiceId,
+      srn,
+      ''
+    );
+    const rcpt = await tx.wait();
+
+    return res.json({ ok: true, tx: rcpt.hash });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+app.listen(process.env.PORT, () => console.log(`RailBridge API on :${process.env.PORT}`));
+```
+
+## 4) `worker.js` — listen for PayoutRequested → route to rail
+```js
+import 'dotenv/config';
+import { ethers } from 'ethers';
+import fs from 'fs';
+import { submitACH } from './rails/ach.js';
+import { payoutTango } from './rails/tango.js';
+
+const provider = new ethers.WebSocketProvider(process.env.WS_URL);
+const execWallet = new ethers.Wallet(process.env.RAIL_EXECUTOR_PK, provider);
+const ledgerAbi = JSON.parse(fs.readFileSync('./abi/ledger.json', 'utf8'));
+const ledger = new ethers.Contract(process.env.LEDGER_ADDR, ledgerAbi, execWallet);
+
+const decodeB32 = (b32) => ethers.toUtf8String(b32).replace(/\u0000+$/, '');
+
+ledger.on('PayoutRequested', async (
+  invoiceId, from, beneficiary, amountTokens, amountUsdCents, rail, srn,
+  roundId, answer, decs, ts, evidence, evt
+) => {
+  try {
+    const railName = decodeB32(rail);
+    console.log('PayoutRequested', railName, invoiceId);
+
+    // Mark submitted (optional early)
+    const submittedRef = ethers.encodeBytes32String('QUEUED');
+    await (await ledger.markPayoutSubmitted(invoiceId, submittedRef, '')).wait();
+
+    if (railName === 'ACH') {
+      const { traceNumber, evidenceURI } = await submitACH({ invoiceId, amountUsdCents });
+      await (await ledger.markPayoutSettled(invoiceId, ethers.encodeBytes32String(traceNumber), evidenceURI)).wait();
+    } else if (railName === 'TANGO') {
+      const { orderId, evidenceURI } = await payoutTango({ invoiceId, cents: Number(amountUsdCents) });
+      await (await ledger.markPayoutSettled(invoiceId, ethers.encodeBytes32String(`TANGO:${orderId}`), evidenceURI)).wait();
+    } else {
+      // Unknown rail → fail
+      await (await ledger.markPayoutFailed(invoiceId, `Unknown rail ${railName}`, '')).wait();
+    }
+  } catch (e) {
+    console.error('Worker error', e);
+    try {
+      await (await ledger.markPayoutFailed(invoiceId, e.message || 'worker error', '')).wait();
+    } catch {}
+  }
+});
+
+console.log('Worker listening…');
+```
+
+## 5) `rails/ach.js` — ACH NACHA (adapter stub)
+```js
+import fs from 'fs';
+
+export async function submitACH({ invoiceId, amountUsdCents }) {
+  // TODO: assemble NACHA file using your existing builder.
+  // For demo, write a placeholder file + fake trace number.
+  const traceNumber = `99912345${Date.now().toString().slice(-7)}`;
+  const path = `./evidence/nacha-${invoiceId}.txt`;
+  fs.mkdirSync('./evidence', { recursive: true });
+  fs.writeFileSync(path, `INV=${invoiceId}\nAMT=${amountUsdCents}\nTRACE=${traceNumber}`);
+  return { traceNumber, evidenceURI: path };
+}
+```
+
+## 6) `rails/tango.js` — Tango payout (gift/virtual card)
+```js
+import axios from 'axios';
+
+const b64 = (s) => Buffer.from(s).toString('base64');
+
+export async function payoutTango({ invoiceId, cents }) {
+  const auth = b64(`${process.env.TANGO_PLATFORM_KEY}:${process.env.TANGO_PLATFORM_SECRET}`);
+  const headers = { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' };
+  const body = {
+    customerIdentifier: process.env.TANGO_CUSTOMER_IDENTIFIER,
+    accountIdentifier: process.env.TANGO_ACCOUNT_IDENTIFIER,
+    amount: cents / 100,
+    sku: "VISA-USD-REWARD", // choose a SKU from Tango catalog
+    clientFulfillmentId: `INV-${invoiceId}`,
+    recipient: { email: "ops@sovr.credit" }
+  };
+  const url = `${process.env.TANGO_BASE}/orders`;
+  const { data } = await axios.post(url, body, { headers });
+  return { orderId: data.referenceOrderId || data.orderId, evidenceURI: `tango:${data.referenceOrderId}` };
+}
+```
+
+## 7) Woo → API payload (what the plugin should POST)
+```json
+{
+  "order_id": 12345,
+  "usd_cents": 2599,
+  "customer_wallet": "0x...",   // optional
+  "beneficiary_eth": "0x...",     // optional
+  "rail": "ACH"                    // or "TANGO"
+}
+```
+
+Headers:
+```
+X-SOVR-Signature: <hex hmac-sha256 of raw JSON using WOO_SHARED_SECRET>
+```
+
+---
+
+**Run it**
+```
+yarn
+cp .env.example .env   # fill values
+node server.js         # webhook/API
+node worker.js         # event-driven rail executor
+```
+
+This is production‑grade structure: API endpoint to create payout intents, event‑driven worker to execute rails, clean adapter separation, and on‑chain audit via the upgradeable ledger. Copy/paste and wire. ✅

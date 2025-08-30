@@ -1,0 +1,90 @@
+2import os
+import time
+import json
+import datetime
+import redis
+import psycopg2
+from pydantic import BaseModel, validator
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+DATABASE_URL = os.getenv("DATABASE_URL")
+r = redis.from_url(REDIS_URL)
+conn = psycopg2.connect(DATABASE_URL)
+conn.autocommit = True
+cur = conn.cursor()
+class NachaPayment(BaseModel):
+    routing_number: str
+    account_number: str
+    amount_cents: int
+    payment_type: str = 'PPD'
+    trace_number: str
+    effective_date: str
+    reference: str
+@validator('routing_number')
+    def routing_must_be_9_digits(cls, v):
+        if len(v) != 9 or not v.isdigit():
+            raise ValueError('Routing number must be 9 digits')
+        return v
+def create_tables():
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS payments (
+        id SERIAL PRIMARY KEY,
+        tx_hash TEXT UNIQUE,
+        recipient TEXT,
+        amount_cents INTEGER,
+        routing_number TEXT,
+        account_number TEXT,
+        payment_type TEXT,
+        trace_number TEXT,
+        effective_date TEXT,
+        reference TEXT,
+        status TEXT DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT NOW()
+    );
+    """)
+def add_payment_to_db(payment: NachaPayment, tx_hash: str, recipient: str):
+    cur.execute("""
+    INSERT INTO payments (tx_hash, recipient, amount_cents, routing_number, account_number, payment_type, trace_number, effective_date, reference)
+    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+    ON CONFLICT (tx_hash) DO NOTHING;
+    """, (tx_hash, recipient, payment.amount_cents, payment.routing_number, payment.account_number, payment.payment_type, payment.trace_number, payment.effective_date, payment.reference))
+def generate_nacha_file(payments):
+    header = f"101 076401251 076401251{datetime.datetime.now().strftime('%y%m%d')}0000001A094101BANK NAME          YOUR COMPANY       \n"
+    batch_header = f"5200YOUR COMPANY       076401251PPD{datetime.datetime.now().strftime('%y%m%d')}   1076401251   0000001\n"
+    entries = ""
+    entry_count = 0
+    for p in payments:
+        entry_count += 1
+        total_debit += p['amount_cents']
+        entries += f"6{p['routing_number']}{p['account_number'].ljust(17)}{str(p['amount_cents']).rjust(10,'0')}0{p['trace_number'].ljust(15)}{p['payment_type']}   \n"
+    batch_control = f"820000000{str(entry_count).rjust(6,'0')}{str(total_debit).rjust(12,'0')}000000000000000000000000000000000000\n"
+    file_control = f"9000001000001{str(entry_count).rjust(6,'0')}{str(total_debit).rjust(12,'0')}000000000000000000000000000000000000\n"
+    return header + batch_header + entries + batch_control + file_control
+def main():
+    create_tables()
+    print("Rail adapter started, consuming payment events...")
+    batch = []
+    while True:
+        _, data = r.brpop("payment_events")
+        event = json.loads(data)
+        # Convert token amount to cents (1 token = $1)
+        amount_cents = int(event['amount'] * 100)
+        payment = NachaPayment(
+            routing_number='123456789',
+            account_number='987654321',
+            amount_cents=amount_cents,
+            trace_number=event['tx_hash'][:15],
+            effective_date=datetime.datetime.now().strftime('%y%m%d'),
+            reference=event['reference']
+        )
+        add_payment_to_db(payment, event['tx_hash'], event['recipient'])
+        batch.append(payment.dict())
+        print(f"Added payment to batch: {payment}")
+        # For demo, generate NACHA file every 5 payments
+        if len(batch) >= 5:
+            nacha_file = generate_nacha_file(batch)
+            with open('payments.nacha', 'w') as f:
+                f.write(nacha_file)
+            print("Generated NACHA file with batch of 5 payments.")
+            batch.clear()
+if __name__ == "__main__":
+    main()

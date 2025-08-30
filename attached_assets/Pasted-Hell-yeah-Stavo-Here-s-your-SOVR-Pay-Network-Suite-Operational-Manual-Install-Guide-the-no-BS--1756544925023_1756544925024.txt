@@ -1,0 +1,121 @@
+Hell yeah, Stavo! Here’s your SOVR Pay Network Suite Operational Manual & Install Guide — the no-BS blueprint to get your beast up, running, and dominating the rails.
+
+SOVR Pay Network Suite
+Operational Manual & Installation Guide
+
+1. Prerequisites
+	• Docker & Docker Compose installed (latest stable versions)
+	• Node.js & Yarn (for frontend builds)
+	• PostgreSQL client (optional, for DB inspection)
+	• Access to your Polygon (or target chain) RPC endpoint
+	• Your smart contract ABI JSON and deployed contract address
+	• WooCommerce site for plugin installation (optional)
+
+2. Setup & Installation
+Clone the Monorepo
+git clone https://your-repo-url/sovrpay-network-suite.git
+cd sovrpay-network-suite
+Configure Environment Variables
+Create .env files or export env vars for each service as needed. Example for API and listener:
+export DATABASE_URL=postgres://sovrpay:sovrpay123@localhost:5432/sovrpaydb
+export REDIS_URL=redis://localhost:6379
+export SECRET_KEY=your_super_secret_key
+export POLYGON_RPC=https://polygon-rpc.com
+export CONTRACT_ADDRESS=0xYourContractAddress
+export CONTRACT_ABI_PATH=/listener/contract_abi.json
+Place your contract ABI JSON file at /listener/contract_abi.json.
+
+Build & Start All Services
+From the root directory:
+docker-compose up --build
+This spins up:
+	• PostgreSQL DB
+	• Redis queue
+	• API backend (FastAPI)
+	• Blockchain listener service
+	• Rail adapter service
+	• React dashboard
+	• Browser extension dev server
+
+3. Service Overview
+Listener Service
+	• Watches your smart contract’s PaymentProcessed events on Polygon
+	• Pushes payment data (amount, recipient, reference, tx hash) to Redis queue
+Rail Adapter Service
+	• Consumes payment events from Redis
+	• Converts token amounts to cents
+	• Batches payments and generates NACHA files
+	• Updates payment ledger in PostgreSQL
+	• (Future) Submits NACHA files to ACH processor
+API Backend
+	• Exposes REST endpoints for: 
+		○ Payment status queries
+		○ Manual batch triggers
+		○ User & bank info management
+	• Secured with JWT (expandable)
+	• Connects to PostgreSQL ledger
+WooCommerce Plugin
+	• Integrates with WooCommerce checkout
+	• Calls API to initiate payments
+	• Redirects users to payment confirmation
+Dashboard
+	• React app for finance ops
+	• Monitors payments, batches, settlement statuses
+	• Manual overrides & exception handling (expandable)
+Browser Extension
+	• MetaMask-powered payment UX
+	• Handles on-chain signing & transaction submission
+	• Syncs with API for payment status
+
+4. Usage & Workflow
+	1. On-Chain Payment Event
+User triggers payment on your smart contract → Listener picks event → pushes to Redis queue.
+	2. Rail Processing
+Rail adapter consumes event → converts units → batches payments → generates NACHA file → updates ledger.
+	3. Payment Settlement
+Submit NACHA file to ACH processor (manual or automated in future) → update settlement status in ledger.
+	4. Monitoring & Control
+Finance team uses Dashboard to monitor flows, exceptions, and trigger manual actions.
+	5. WooCommerce Integration
+Customers pay via WooCommerce → plugin calls API → payment processed on-chain and off-chain rails.
+	6. User Payment UX
+Browser extension handles wallet connection, signing, and payment confirmation.
+
+5. Maintenance & Scaling
+	• Database: Backup PostgreSQL regularly, monitor performance.
+	• Redis: Monitor queue length, scale Redis cluster if needed.
+	• API & Services: Use Docker orchestration tools (Kubernetes, Docker Swarm) for scaling.
+	• Security: Rotate secrets, enforce RBAC, enable HTTPS & mTLS.
+	• Compliance: Integrate KYC/AML modules as needed.
+	• Logging & Monitoring: Add Prometheus + Grafana or ELK stack for observability.
+
+6. Extending the Suite
+	• Add support for other rails (SEPA, SWIFT) via modular rail adapters.
+	• Automate NACHA file submission via SFTP or API integration.
+	• Build AI-powered anomaly detection & compliance modules.
+	• Expand dashboard with reporting, alerts, and user management.
+	• Enhance browser extension with multi-chain support and UX polish.
+
+7. Troubleshooting
+	• Listener not picking events?
+Check RPC endpoint, contract address, and ABI correctness.
+	• Rail adapter batch stuck?
+Inspect Redis queue, database connectivity, and logs.
+	• API 500 errors?
+Verify database connection string, environment variables, and logs.
+	• WooCommerce plugin issues?
+Enable WP debug, check API URL and network calls.
+	• Dashboard empty?
+Confirm API is running and accessible, check CORS settings.
+
+8. Support & Contribution
+	• Open issues and feature requests on your repo.
+	• Follow coding standards and write tests for new features.
+	• Document all changes and update this manual accordingly.
+
+Stavo, this manual is your battle map to deploy, operate, and scale the SOVR Pay Network Suite like the crypto-rail king you are. Ready to dominate? I’m here to build out docs, tests, or AI automation next — just say the word. 🔥🚀
+
+From <https://apps.abacus.ai/chatllm/?appId=7b1a364b2&convoId=b0f386446> 
+
+
+From <https://apps.abacus.ai/chatllm/?appId=7b1a364b2&convoId=b0f386446> 
