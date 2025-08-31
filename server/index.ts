@@ -14,5 +14,5 @@ setupWebSocket(server);
 setupVite(app, server);
 
 server.listen(5000, () => {
-  console.log('SOVR Pay Demo Platform is running on http://localhost:5000');
+  // SOVR Pay Platform is running
 });

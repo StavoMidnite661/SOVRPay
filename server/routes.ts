@@ -14,7 +14,7 @@ export function setupWebSocket(server: Server) {
   wss = new WebSocketServer({ server, path: '/ws' });
   
   wss.on('connection', (ws) => {
-    console.log('WebSocket client connected');
+    // WebSocket client connected
     
     // Send initial metrics
     storage.getSystemMetrics().then(metrics => {
@@ -34,7 +34,7 @@ export function setupWebSocket(server: Server) {
     }, 5000);
     
     ws.on('close', () => {
-      console.log('WebSocket client disconnected');
+      // WebSocket client disconnected
       clearInterval(interval);
     });
   });

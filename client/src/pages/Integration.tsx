@@ -53,7 +53,7 @@ const payment = await sovrPay.createPayment({
 
 // Handle payment result
 if (payment.status === 'completed') {
-  console.log('Payment successful!');
+  // Payment successful
 }`;
 
   return (

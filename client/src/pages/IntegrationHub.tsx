@@ -120,7 +120,7 @@ const payment = await sovrPay.payments.create({
   }
 });
 
-console.log('Payment URL:', payment.checkout_url);`,
+// Payment URL: payment.checkout_url`,
 
     webhooks: `// Webhook Handler Example
 app.post('/webhooks/sovr-pay', (req, res) => {
