@@ -2,6 +2,7 @@ import express from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import path from 'path';
+import fs from 'fs';
 import { storage } from './storage';
 import { createPaymentSchema, createSmartContractSchema } from '@shared/schema';
 
@@ -225,19 +226,24 @@ router.get('/api/download-extension', (req, res) => {
   try {
     const file = path.join(process.cwd(), 'public', 'sovr-extension.zip');
     
+    // Check if file exists first
+    if (!fs.existsSync(file)) {
+      return res.status(404).json({ error: 'Extension not available' });
+    }
+    
+    const stats = fs.statSync(file);
+    
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', 'attachment; filename="sovr-pay-extension.zip"');
-    res.setHeader('Content-Length', require('fs').statSync(file).size);
+    res.setHeader('Content-Length', stats.size);
     
     res.download(file, 'sovr-pay-extension.zip', (err) => {
       if (err) {
-        console.error('Download error:', err);
-        res.status(500).send('Error downloading extension');
+        res.status(500).json({ error: 'Download failed' });
       }
     });
   } catch (error) {
-    console.error('Extension download error:', error);
-    res.status(404).json({ error: 'Extension file not found' });
+    res.status(404).json({ error: 'Extension not available' });
   }
 });
 
