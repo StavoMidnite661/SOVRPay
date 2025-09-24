@@ -304,7 +304,7 @@ export class TransactionReceiptService {
       </div>
       <div class="footer">
         <p>This is an official receipt from SOVR Pay Financial Technology Platform</p>
-        <p>For support, contact support@sovrpay.com</p>
+        <p>For support, contact support@sovr.credit</p>
       </div>
     </body>
     </html>
@@ -330,7 +330,7 @@ export class TransactionReceiptService {
       
       await mailService.send({
         to: receipt.userEmail,
-        from: 'noreply@sovrpay.com', // Must be verified sender in SendGrid
+        from: 'noreply@sovr.credit', // Official SOVR domain
         subject,
         html: this.generateHTMLReceipt({
           title: this.getTransactionTitle(receipt.transactionType),
