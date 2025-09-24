@@ -54,6 +54,7 @@ export function Dashboard() {
               <Button 
                 variant="secondary" 
                 size="lg"
+                onClick={() => scrollToSection('overview')}
                 data-testid="button-documentation"
               >
                 <i className="fas fa-book mr-2"></i>
@@ -62,12 +63,14 @@ export function Dashboard() {
             </div>
           </div>
 
-          {/* Stats */}
+          {/* Real-time Stats */}
           {currentMetrics && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-16">
               <div className="bg-card rounded-lg p-6 text-center border border-border">
-                <div className="text-3xl font-bold text-primary mb-2 stat-counter">99.9%</div>
-                <div className="text-muted-foreground">Uptime</div>
+                <div className="text-3xl font-bold text-primary mb-2 stat-counter">
+                  {currentMetrics.successRate}%
+                </div>
+                <div className="text-muted-foreground">Success Rate</div>
               </div>
               <div className="bg-card rounded-lg p-6 text-center border border-border">
                 <div className="text-3xl font-bold text-accent mb-2 stat-counter">
@@ -76,12 +79,16 @@ export function Dashboard() {
                 <div className="text-muted-foreground">Avg Response</div>
               </div>
               <div className="bg-card rounded-lg p-6 text-center border border-border">
-                <div className="text-3xl font-bold text-primary mb-2 stat-counter">1M+</div>
-                <div className="text-muted-foreground">Transactions</div>
+                <div className="text-3xl font-bold text-primary mb-2 stat-counter">
+                  {currentMetrics.transactionVolume.toLocaleString()}
+                </div>
+                <div className="text-muted-foreground">Transaction Volume</div>
               </div>
               <div className="bg-card rounded-lg p-6 text-center border border-border">
-                <div className="text-3xl font-bold text-accent mb-2 stat-counter">150+</div>
-                <div className="text-muted-foreground">Countries</div>
+                <div className="text-3xl font-bold text-accent mb-2 stat-counter">
+                  {currentMetrics.activeMerchants.toLocaleString()}
+                </div>
+                <div className="text-muted-foreground">Active Merchants</div>
               </div>
             </div>
           )}
