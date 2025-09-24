@@ -330,7 +330,7 @@ export class TransactionReceiptService {
       
       await mailService.send({
         to: receipt.userEmail,
-        from: 'receipts@sovrpay.com',
+        from: 'noreply@sovrpay.com', // Must be verified sender in SendGrid
         subject,
         html: this.generateHTMLReceipt({
           title: this.getTransactionTitle(receipt.transactionType),

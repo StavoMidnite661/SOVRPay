@@ -31,7 +31,7 @@ export interface IStorage {
   logApiRequest(request: Omit<ApiRequest, 'id'>): Promise<ApiRequest>;
   
   // Receipt and Notification Management
-  saveTransactionReceipt(receipt: Omit<TransactionReceipt, 'id'>): Promise<TransactionReceipt>;
+  saveTransactionReceipt(receipt: TransactionReceipt): Promise<TransactionReceipt>;
   getTransactionReceipt(receiptId: string): Promise<TransactionReceipt | null>;
   getTransactionReceiptsByUser(userId: string): Promise<TransactionReceipt[]>;
   updateReceiptStatus(receiptId: string, status: string, notificationHistory?: any[]): Promise<void>;
