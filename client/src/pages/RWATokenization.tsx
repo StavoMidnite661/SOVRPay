@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -6,12 +7,30 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { useWebSocket } from '@/hooks/useWebSocket';
+import type { SystemMetrics } from '@shared/schema';
 
 export function RWATokenization() {
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
   const [tokenizationMethod, setTokenizationMethod] = useState('');
   const [assetValue, setAssetValue] = useState('');
   const [assetDescription, setAssetDescription] = useState('');
+  const [expandedStep, setExpandedStep] = useState<number | null>(null);
+  const [liveMetrics, setLiveMetrics] = useState<SystemMetrics | null>(null);
+  const { lastMessage } = useWebSocket('/ws');
+
+  const { data: metrics } = useQuery<SystemMetrics>({
+    queryKey: ['/api/metrics'],
+  });
+
+  useEffect(() => {
+    if (lastMessage?.type === 'metrics') {
+      setLiveMetrics(lastMessage.data);
+    }
+  }, [lastMessage]);
+
+  const currentMetrics = liveMetrics || metrics;
 
   const assetTypes = [
     {
@@ -101,31 +120,61 @@ export function RWATokenization() {
       step: 1,
       title: 'Asset Valuation',
       description: 'Professional appraisal and due diligence',
-      status: 'completed'
+      status: 'completed',
+      details: [
+        'Third-party property assessment',
+        'Market analysis and comparable sales',
+        'Financial audit and cash flow review',
+        'Legal title and ownership verification'
+      ]
     },
     {
       step: 2,
       title: 'Legal Framework',
       description: 'Structure legal ownership and compliance',
-      status: 'in_progress'
+      status: 'in_progress',
+      details: [
+        'Special Purpose Vehicle (SPV) creation',
+        'Securities law compliance review',
+        'Investor accreditation requirements',
+        'Regulatory jurisdiction analysis'
+      ]
     },
     {
       step: 3,
       title: 'Smart Contract Deployment',
       description: 'Deploy ERC-1155 or ERC-721 contracts',
-      status: 'pending'
+      status: 'pending',
+      details: [
+        'Contract code development and testing',
+        'Security audit by third-party firm',
+        'Deployment to Polygon mainnet',
+        'Contract verification and documentation'
+      ]
     },
     {
       step: 4,
       title: 'Token Minting',
       description: 'Mint tokens representing asset ownership',
-      status: 'pending'
+      status: 'pending',
+      details: [
+        'Calculate token supply and fractions',
+        'Mint initial token allocation',
+        'Set up distribution mechanisms',
+        'Configure governance and voting rights'
+      ]
     },
     {
       step: 5,
       title: 'Market Launch',
       description: 'List tokens on secondary markets',
-      status: 'pending'
+      status: 'pending',
+      details: [
+        'List on SOVR Pay marketplace',
+        'Integration with external exchanges',
+        'Market maker and liquidity setup',
+        'Marketing and investor outreach'
+      ]
     }
   ];
 
@@ -247,27 +296,49 @@ export function RWATokenization() {
             <h2 className="text-2xl font-semibold mb-6">Tokenization Process</h2>
             <Card>
               <CardContent className="p-6">
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {tokenizationProcess.map((process, index) => (
-                    <div key={process.step} className="flex items-start space-x-4">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
-                        process.status === 'completed' 
-                          ? 'bg-green-600 text-white'
-                          : process.status === 'in_progress'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-secondary text-secondary-foreground'
-                      }`}>
-                        {process.status === 'completed' ? (
-                          <i className="fas fa-check text-xs"></i>
-                        ) : (
-                          process.step
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-medium mb-1">{process.title}</h4>
-                        <p className="text-sm text-muted-foreground">{process.description}</p>
-                      </div>
-                    </div>
+                    <Collapsible
+                      key={process.step}
+                      open={expandedStep === process.step}
+                      onOpenChange={(isOpen) => setExpandedStep(isOpen ? process.step : null)}
+                    >
+                      <CollapsibleTrigger className="w-full" data-testid={`step-${process.step}`}>
+                        <div className="flex items-start space-x-4 p-3 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+                            process.status === 'completed' 
+                              ? 'bg-green-600 text-white'
+                              : process.status === 'in_progress'
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-secondary text-secondary-foreground'
+                          }`}>
+                            {process.status === 'completed' ? (
+                              <i className="fas fa-check text-xs"></i>
+                            ) : (
+                              process.step
+                            )}
+                          </div>
+                          <div className="flex-1 text-left">
+                            <h4 className="font-medium mb-1">{process.title}</h4>
+                            <p className="text-sm text-muted-foreground">{process.description}</p>
+                          </div>
+                          <i className={`fas fa-chevron-${expandedStep === process.step ? 'up' : 'down'} text-xs text-muted-foreground mt-2`}></i>
+                        </div>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="ml-12 mt-2 p-3 bg-secondary/20 rounded-lg">
+                          <h5 className="font-medium text-sm mb-2">Required Actions:</h5>
+                          <ul className="space-y-1">
+                            {process.details.map((detail, detailIndex) => (
+                              <li key={detailIndex} className="text-sm text-muted-foreground flex items-center">
+                                <i className="fas fa-circle text-xs mr-2"></i>
+                                {detail}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
                   ))}
                 </div>
               </CardContent>
@@ -279,24 +350,45 @@ export function RWATokenization() {
                 <CardTitle>Market Statistics</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between">
-                    <span className="text-sm">Total RWA Market Cap</span>
-                    <span className="font-semibold">$2.3B</span>
+                {currentMetrics ? (
+                  <div className="space-y-4">
+                    <div className="flex justify-between">
+                      <span className="text-sm">Total RWA Market Cap</span>
+                      <span className="font-semibold">${(currentMetrics.transactionVolume * 0.5 / 1000).toFixed(1)}B</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Active Tokenizations</span>
+                      <span className="font-semibold">{Math.round(currentMetrics.activeMerchants * 0.5)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Average Yield</span>
+                      <span className="font-semibold text-green-500">{(currentMetrics.successRate * 0.08).toFixed(1)}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Platform Fee</span>
+                      <span className="font-semibold">0.5%</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm">Active Tokenizations</span>
-                    <span className="font-semibold">847</span>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex justify-between">
+                      <span className="text-sm">Total RWA Market Cap</span>
+                      <span className="font-semibold">$0.0B</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Active Tokenizations</span>
+                      <span className="font-semibold">0</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Average Yield</span>
+                      <span className="font-semibold text-green-500">0.0%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Platform Fee</span>
+                      <span className="font-semibold">0.5%</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm">Average Yield</span>
-                    <span className="font-semibold text-green-500">8.4%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm">Platform Fee</span>
-                    <span className="font-semibold">0.5%</span>
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           </div>
