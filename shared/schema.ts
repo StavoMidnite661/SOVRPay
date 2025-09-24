@@ -106,3 +106,165 @@ export const geographicDataSchema = z.object({
 });
 
 export type GeographicData = z.infer<typeof geographicDataSchema>;
+
+// User Notification Preferences Schema
+export const userNotificationPreferencesSchema = z.object({
+  userId: z.string(),
+  email: z.string().email(),
+  phone: z.string().optional(),
+  enableEmailReceipts: z.boolean().default(true),
+  enableSMSAlerts: z.boolean().default(false),
+  enableInAppNotifications: z.boolean().default(true),
+  timezone: z.string().default('UTC'),
+  language: z.string().default('en'),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export type UserNotificationPreferences = z.infer<typeof userNotificationPreferencesSchema>;
+
+// Transaction Receipt Schema - Unified for all transaction types
+export const transactionReceiptSchema = z.object({
+  id: z.string(),
+  receiptNumber: z.string(), // Human-readable receipt number (e.g., RCP-2024-001234)
+  transactionType: z.enum(['payment', 'tokenization', 'defi_stake', 'defi_unstake', 'compliance_kyc', 'smart_contract_deploy', 'refund', 'settlement']),
+  transactionId: z.string(), // Reference to the original transaction
+  userId: z.string(),
+  userEmail: z.string().email(),
+  
+  // Financial Details
+  amount: z.number().optional(),
+  currency: z.string().optional(),
+  exchangeRate: z.number().optional(),
+  feeAmount: z.number().optional(),
+  netAmount: z.number().optional(),
+  
+  // Transaction-Specific Data
+  assetDetails: z.object({
+    name: z.string().optional(),
+    symbol: z.string().optional(),
+    contractAddress: z.string().optional(),
+    tokenId: z.string().optional(),
+    quantity: z.number().optional(),
+  }).optional(),
+  
+  // Blockchain Information
+  networkDetails: z.object({
+    network: z.string().optional(),
+    blockNumber: z.number().optional(),
+    transactionHash: z.string().optional(),
+    gasUsed: z.number().optional(),
+    gasFee: z.number().optional(),
+  }).optional(),
+  
+  // Compliance Information
+  complianceData: z.object({
+    kycStatus: z.string().optional(),
+    amlChecked: z.boolean().optional(),
+    jurisdictionCode: z.string().optional(),
+    regulatoryReference: z.string().optional(),
+    reportingRequired: z.boolean().optional(),
+  }).optional(),
+  
+  // Receipt Status and Delivery
+  status: z.enum(['generated', 'sent', 'delivered', 'failed']),
+  generatedAt: z.string(),
+  sentAt: z.string().optional(),
+  deliveredAt: z.string().optional(),
+  
+  // Document Storage
+  receiptDocuments: z.array(z.object({
+    format: z.enum(['html', 'pdf', 'json', 'xml']),
+    storageUrl: z.string(),
+    size: z.number(),
+    checksum: z.string(),
+  })),
+  
+  // Notification Delivery Status
+  notificationHistory: z.array(z.object({
+    method: z.enum(['email', 'sms', 'in_app', 'webhook']),
+    recipient: z.string(),
+    status: z.enum(['pending', 'sent', 'delivered', 'failed', 'bounced']),
+    sentAt: z.string(),
+    deliveredAt: z.string().optional(),
+    errorMessage: z.string().optional(),
+    providerResponse: z.record(z.any()).optional(),
+  })),
+  
+  // Audit and Security
+  immutableReference: z.string(), // Hash of receipt content for integrity verification
+  metadata: z.record(z.any()).optional(),
+});
+
+export const createTransactionReceiptSchema = transactionReceiptSchema.omit({
+  id: true,
+  receiptNumber: true,
+  status: true,
+  generatedAt: true,
+  sentAt: true,
+  deliveredAt: true,
+  immutableReference: true,
+});
+
+export type TransactionReceipt = z.infer<typeof transactionReceiptSchema>;
+export type CreateTransactionReceipt = z.infer<typeof createTransactionReceiptSchema>;
+
+// Transaction Event Schema - For unified event orchestration
+export const transactionEventSchema = z.object({
+  id: z.string(),
+  eventType: z.enum(['payment_completed', 'tokenization_completed', 'defi_stake_completed', 'defi_unstake_completed', 'compliance_check_completed', 'smart_contract_deployed', 'refund_processed', 'settlement_completed']),
+  transactionId: z.string(),
+  userId: z.string(),
+  domain: z.enum(['payments', 'tokenization', 'defi', 'compliance', 'smart_contracts']),
+  
+  // Event Data Payload
+  eventData: z.record(z.any()),
+  
+  // Processing Status
+  receiptGenerated: z.boolean().default(false),
+  notificationsSent: z.boolean().default(false),
+  
+  // Timestamps
+  createdAt: z.string(),
+  processedAt: z.string().optional(),
+  
+  // Audit Trail
+  processingErrors: z.array(z.object({
+    component: z.string(),
+    error: z.string(),
+    timestamp: z.string(),
+  })).optional(),
+});
+
+export type TransactionEvent = z.infer<typeof transactionEventSchema>;
+
+// Notification Template Schema
+export const notificationTemplateSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  transactionType: z.enum(['payment', 'tokenization', 'defi_stake', 'defi_unstake', 'compliance_kyc', 'smart_contract_deploy', 'refund', 'settlement']),
+  format: z.enum(['email', 'sms', 'in_app']),
+  
+  // Template Content
+  subject: z.string().optional(), // For email
+  htmlTemplate: z.string().optional(),
+  textTemplate: z.string().optional(),
+  
+  // Template Variables
+  variables: z.array(z.string()),
+  
+  // Branding and Styling
+  brandingEnabled: z.boolean().default(true),
+  customStyling: z.record(z.any()).optional(),
+  
+  // Compliance Requirements
+  includeDisclaimer: z.boolean().default(true),
+  disclaimerText: z.string().optional(),
+  
+  // Status
+  isActive: z.boolean().default(true),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export type NotificationTemplate = z.infer<typeof notificationTemplateSchema>;
