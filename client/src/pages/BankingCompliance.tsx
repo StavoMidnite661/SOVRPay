@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -6,10 +7,141 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useWebSocket } from '@/hooks/useWebSocket';
+import { useToast } from '@/hooks/use-toast';
+import { apiRequest, queryClient } from '@/lib/queryClient';
+import type { SystemMetrics } from '@shared/schema';
 
 export function BankingCompliance() {
   const [selectedCompliance, setSelectedCompliance] = useState<string | null>(null);
   const [reportType, setReportType] = useState('');
+  const [showKycModal, setShowKycModal] = useState(false);
+  const [kycFormData, setKycFormData] = useState({
+    fullName: '',
+    dateOfBirth: '',
+    address: '',
+    documentType: '',
+    documentNumber: ''
+  });
+  const [uploadedFiles, setUploadedFiles] = useState({
+    idDocument: null as File | null,
+    selfie: null as File | null
+  });
+  const [kycStatus, setKycStatus] = useState('pending'); // pending, approved, rejected, under_review
+  const [liveMetrics, setLiveMetrics] = useState<SystemMetrics | null>(null);
+  const { lastMessage } = useWebSocket('/ws');
+  const { toast } = useToast();
+
+  const { data: metrics } = useQuery<SystemMetrics>({
+    queryKey: ['/api/metrics'],
+  });
+
+  useEffect(() => {
+    if (lastMessage?.type === 'metrics') {
+      setLiveMetrics(lastMessage.data);
+    }
+  }, [lastMessage]);
+
+  const currentMetrics = liveMetrics || metrics;
+
+  // KYC submission mutation
+  const kycMutation = useMutation({
+    mutationFn: async (kycData: FormData) => {
+      return apiRequest('/api/kyc/submit', {
+        method: 'POST',
+        body: kycData,
+      });
+    },
+    onSuccess: () => {
+      setKycStatus('under_review');
+      toast({
+        title: "KYC Submitted Successfully",
+        description: "Your verification documents have been submitted for review.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/kyc/status'] });
+      
+      // Only clear form and close modal on successful submission
+      setShowKycModal(false);
+      setKycFormData({
+        fullName: '',
+        dateOfBirth: '',
+        address: '',
+        documentType: '',
+        documentNumber: ''
+      });
+      setUploadedFiles({ idDocument: null, selfie: null });
+    },
+    onError: (error) => {
+      toast({
+        title: "Submission Failed",
+        description: "There was an error submitting your KYC documents. Please try again.",
+        variant: "destructive",
+      });
+      // Keep modal open and preserve form data on error
+    },
+  });
+
+  // Query KYC status
+  const { data: kycStatusData } = useQuery({
+    queryKey: ['/api/kyc/status'],
+    queryFn: () => fetch('/api/kyc/status').then(res => res.json()).catch(() => ({ status: kycStatus })),
+  });
+
+  useEffect(() => {
+    if (kycStatusData?.status) {
+      setKycStatus(kycStatusData.status);
+    }
+  }, [kycStatusData]);
+
+  const handleFileUpload = (file: File, type: 'idDocument' | 'selfie') => {
+    setUploadedFiles(prev => ({ ...prev, [type]: file }));
+  };
+
+  const handleKycSubmit = () => {
+    if (!kycFormData.fullName || !kycFormData.dateOfBirth || !kycFormData.address) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('fullName', kycFormData.fullName);
+    formData.append('dateOfBirth', kycFormData.dateOfBirth);
+    formData.append('address', kycFormData.address);
+    formData.append('documentType', kycFormData.documentType);
+    formData.append('documentNumber', kycFormData.documentNumber);
+    
+    if (uploadedFiles.idDocument) {
+      formData.append('idDocument', uploadedFiles.idDocument);
+    }
+    if (uploadedFiles.selfie) {
+      formData.append('selfie', uploadedFiles.selfie);
+    }
+
+    // Submit the form - success/failure handling is in the mutation callbacks
+    kycMutation.mutate(formData);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'approved': return 'text-green-500';
+      case 'rejected': return 'text-red-500';
+      case 'under_review': return 'text-yellow-500';
+      default: return 'text-muted-foreground';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'approved': return 'Approved';
+      case 'rejected': return 'Rejected';
+      case 'under_review': return 'Under Review';
+      default: return 'Pending';
+    }
+  };
 
   const complianceFrameworks = [
     {
@@ -272,8 +404,248 @@ export function BankingCompliance() {
                       </div>
                     </div>
                   </div>
+                  
+                  {/* KYC Verification Flow */}
+                  {selectedCompliance === 'kyc_aml' && (
+                    <div className="mt-6 pt-6 border-t">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="font-semibold">KYC Verification</h4>
+                        <Button 
+                          onClick={() => setShowKycModal(true)}
+                          data-testid="button-start-kyc"
+                          className="bg-primary hover:bg-primary/90"
+                        >
+                          <i className="fas fa-user-check mr-2"></i>
+                          Start KYC Verification
+                        </Button>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div className="space-y-2">
+                          <h5 className="font-medium">Required Documents:</h5>
+                          <ul className="space-y-1 text-muted-foreground">
+                            <li>• Government-issued ID (Passport/Driver's License)</li>
+                            <li>• Proof of Address (Utility Bill/Bank Statement)</li>
+                            <li>• Selfie for Identity Verification</li>
+                          </ul>
+                        </div>
+                        <div className="space-y-2">
+                          <h5 className="font-medium">Verification Status:</h5>
+                          <div className="flex items-center space-x-2">
+                            <div className={`w-3 h-3 rounded-full ${
+                              kycStatus === 'approved' ? 'bg-green-500' : 
+                              kycStatus === 'rejected' ? 'bg-red-500' :
+                              kycStatus === 'under_review' ? 'bg-yellow-500' : 'bg-gray-400'
+                            }`}></div>
+                            <span className={getStatusColor(kycStatus)}>
+                              Documents {getStatusText(kycStatus)}
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <div className={`w-3 h-3 rounded-full ${
+                              kycStatus === 'approved' ? 'bg-green-500' : 'bg-gray-400'
+                            }`}></div>
+                            <span className={kycStatus === 'approved' ? 'text-green-500' : 'text-muted-foreground'}>
+                              Identity {kycStatus === 'approved' ? 'Verified' : 'Pending'}
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <div className={`w-3 h-3 rounded-full ${
+                              kycStatus === 'approved' ? 'bg-green-500' : 'bg-gray-400'
+                            }`}></div>
+                            <span className={kycStatus === 'approved' ? 'text-green-500' : 'text-muted-foreground'}>
+                              AML Check {kycStatus === 'approved' ? 'Completed' : 'Pending'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
+            )}
+
+            {/* KYC Verification Modal */}
+            {showKycModal && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-testid="kyc-modal-overlay">
+                <div className="bg-background rounded-lg shadow-lg p-6 w-full max-w-2xl mx-4 border max-h-[90vh] overflow-y-auto">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl font-semibold">KYC Verification Form</h3>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setShowKycModal(false)}
+                      data-testid="button-close-kyc-modal"
+                    >
+                      ✕
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="full-name" className="text-sm font-medium">Full Legal Name</Label>
+                        <Input
+                          id="full-name"
+                          placeholder="Enter your full legal name"
+                          value={kycFormData.fullName}
+                          onChange={(e) => setKycFormData({...kycFormData, fullName: e.target.value})}
+                          className="mt-1"
+                          data-testid="input-full-name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="date-of-birth" className="text-sm font-medium">Date of Birth</Label>
+                        <Input
+                          id="date-of-birth"
+                          type="date"
+                          value={kycFormData.dateOfBirth}
+                          onChange={(e) => setKycFormData({...kycFormData, dateOfBirth: e.target.value})}
+                          className="mt-1"
+                          data-testid="input-date-of-birth"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="address" className="text-sm font-medium">Home Address</Label>
+                      <Input
+                        id="address"
+                        placeholder="Enter your full address"
+                        value={kycFormData.address}
+                        onChange={(e) => setKycFormData({...kycFormData, address: e.target.value})}
+                        className="mt-1"
+                        data-testid="input-address"
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="document-type" className="text-sm font-medium">Document Type</Label>
+                        <Select value={kycFormData.documentType} onValueChange={(value) => setKycFormData({...kycFormData, documentType: value})}>
+                          <SelectTrigger className="mt-1" data-testid="select-document-type">
+                            <SelectValue placeholder="Select document type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="passport">Passport</SelectItem>
+                            <SelectItem value="drivers_license">Driver's License</SelectItem>
+                            <SelectItem value="national_id">National ID Card</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="document-number" className="text-sm font-medium">Document Number</Label>
+                        <Input
+                          id="document-number"
+                          placeholder="Enter document number"
+                          value={kycFormData.documentNumber}
+                          onChange={(e) => setKycFormData({...kycFormData, documentNumber: e.target.value})}
+                          className="mt-1"
+                          data-testid="input-document-number"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium">Document Upload</Label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center">
+                          <i className="fas fa-id-card text-2xl text-muted-foreground mb-2"></i>
+                          <p className="text-sm text-muted-foreground">
+                            {uploadedFiles.idDocument ? uploadedFiles.idDocument.name : 'Upload ID Document'}
+                          </p>
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleFileUpload(file, 'idDocument');
+                            }}
+                            className="hidden"
+                            id="id-document-upload"
+                            data-testid="input-upload-id"
+                          />
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="mt-2" 
+                            onClick={() => document.getElementById('id-document-upload')?.click()}
+                            data-testid="button-upload-id"
+                          >
+                            {uploadedFiles.idDocument ? 'Change File' : 'Choose File'}
+                          </Button>
+                        </div>
+                        <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center">
+                          <i className="fas fa-camera text-2xl text-muted-foreground mb-2"></i>
+                          <p className="text-sm text-muted-foreground">
+                            {uploadedFiles.selfie ? uploadedFiles.selfie.name : 'Upload Selfie'}
+                          </p>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleFileUpload(file, 'selfie');
+                            }}
+                            className="hidden"
+                            id="selfie-upload"
+                            data-testid="input-upload-selfie"
+                          />
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="mt-2"
+                            onClick={() => document.getElementById('selfie-upload')?.click()}
+                            data-testid="button-upload-selfie"
+                          >
+                            {uploadedFiles.selfie ? 'Change File' : 'Choose File'}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex space-x-3 pt-4">
+                      <Button 
+                        className="flex-1" 
+                        onClick={handleKycSubmit}
+                        disabled={kycMutation.isPending}
+                        data-testid="button-submit-kyc"
+                      >
+                        {kycMutation.isPending ? (
+                          <>
+                            <i className="fas fa-spinner fa-spin mr-2"></i>
+                            Submitting...
+                          </>
+                        ) : (
+                          <>
+                            <i className="fas fa-check mr-2"></i>
+                            Submit for Verification
+                          </>
+                        )}
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        className="flex-1"
+                        onClick={() => {
+                          setShowKycModal(false);
+                          // Optionally clear form on manual cancel
+                          setKycFormData({
+                            fullName: '',
+                            dateOfBirth: '',
+                            address: '',
+                            documentType: '',
+                            documentNumber: ''
+                          });
+                          setUploadedFiles({ idDocument: null, selfie: null });
+                        }}
+                        data-testid="button-cancel-kyc"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
           </TabsContent>
 

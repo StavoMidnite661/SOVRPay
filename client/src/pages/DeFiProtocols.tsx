@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import type { SystemMetrics } from '@shared/schema';
 
@@ -334,85 +333,105 @@ export function DeFiProtocols() {
                         <span className="font-medium ml-2">0.00%</span>
                       </div>
                     </div>
-                    <Dialog open={showLiquidityModal && selectedPool === pool.name} onOpenChange={(open) => {
-                      setShowLiquidityModal(open);
-                      if (!open) setSelectedPool(null);
-                    }}>
-                      <DialogTrigger asChild>
-                        <Button 
-                          className="w-full mt-3" 
-                          size="sm"
-                          onClick={() => {
-                            setSelectedPool(pool.name);
-                            setShowLiquidityModal(true);
-                          }}
-                          data-testid={`add-liquidity-${pool.name.toLowerCase().replace('/', '-')}`}
-                        >
-                          Add Liquidity
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                          <DialogTitle>Add Liquidity to {pool.name}</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          <div>
-                            <Label htmlFor="liquidity-amount">Amount</Label>
-                            <Input
-                              id="liquidity-amount"
-                              placeholder="Enter amount"
-                              value={liquidityAmount}
-                              onChange={(e) => setLiquidityAmount(e.target.value)}
-                              data-testid="input-liquidity-amount"
-                            />
-                          </div>
-                          <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                              <span>Pool APY:</span>
-                              <span className="font-medium text-green-500">{pool.apy}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Pool TVL:</span>
-                              <span className="font-medium">{pool.tvl}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Pool Fees:</span>
-                              <span className="font-medium">{pool.fees}</span>
-                            </div>
-                          </div>
-                          <div className="flex space-x-2">
-                            <Button 
-                              className="flex-1" 
-                              onClick={() => {
-                                // Simulate liquidity addition
-                                setShowLiquidityModal(false);
-                                setSelectedPool(null);
-                                setLiquidityAmount('');
-                              }}
-                              data-testid="button-confirm-liquidity"
-                            >
-                              Confirm
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              className="flex-1"
-                              onClick={() => {
-                                setShowLiquidityModal(false);
-                                setSelectedPool(null);
-                                setLiquidityAmount('');
-                              }}
-                              data-testid="button-cancel-liquidity"
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
+                    <Button 
+                      className="w-full mt-3" 
+                      size="sm"
+                      onClick={() => {
+                        setSelectedPool(pool.name);
+                        setShowLiquidityModal(true);
+                      }}
+                      data-testid={`add-liquidity-${pool.name.toLowerCase().replace('/', '-')}`}
+                    >
+                      Add Liquidity
+                    </Button>
                   </CardContent>
                 </Card>
               ))}
             </div>
+
+            {/* Liquidity Modal */}
+            {showLiquidityModal && selectedPool && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" data-testid="liquidity-modal-overlay">
+                <div className="bg-background rounded-lg shadow-lg p-6 w-full max-w-md mx-4 border">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold">Add Liquidity to {selectedPool}</h3>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => {
+                        setShowLiquidityModal(false);
+                        setSelectedPool(null);
+                        setLiquidityAmount('');
+                      }}
+                      data-testid="button-close-modal"
+                    >
+                      ✕
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="liquidity-amount" className="text-sm font-medium">Amount</Label>
+                      <Input
+                        id="liquidity-amount"
+                        placeholder="Enter amount (e.g., 1000)"
+                        value={liquidityAmount}
+                        onChange={(e) => setLiquidityAmount(e.target.value)}
+                        className="mt-1 w-full text-foreground bg-background border-input"
+                        data-testid="input-liquidity-amount"
+                      />
+                    </div>
+                    
+                    {/* Pool Info */}
+                    <div className="space-y-2 text-sm bg-muted/50 p-3 rounded">
+                      {liquidityPools.map((pool) => pool.name === selectedPool && (
+                        <div key={pool.name}>
+                          <div className="flex justify-between">
+                            <span>Pool APY:</span>
+                            <span className="font-medium text-green-500">{pool.apy}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Pool TVL:</span>
+                            <span className="font-medium">{pool.tvl}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Pool Fees:</span>
+                            <span className="font-medium">{pool.fees}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="flex space-x-2 pt-2">
+                      <Button 
+                        className="flex-1" 
+                        onClick={() => {
+                          // Simulate liquidity addition
+                          setShowLiquidityModal(false);
+                          setSelectedPool(null);
+                          setLiquidityAmount('');
+                        }}
+                        data-testid="button-confirm-liquidity"
+                      >
+                        Confirm
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        className="flex-1"
+                        onClick={() => {
+                          setShowLiquidityModal(false);
+                          setSelectedPool(null);
+                          setLiquidityAmount('');
+                        }}
+                        data-testid="button-cancel-liquidity"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="governance" className="space-y-8">
