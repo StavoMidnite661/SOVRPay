@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -6,6 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Slider } from '@/components/ui/slider';
+import { useWebSocket } from '@/hooks/useWebSocket';
+import type { SystemMetrics } from '@shared/schema';
 
 export function BrowserExtension() {
   const [isExtensionActive, setIsExtensionActive] = useState(false);
@@ -13,6 +17,21 @@ export function BrowserExtension() {
   const [mockWebsite, setMockWebsite] = useState('amazon');
   const [showPaymentOverlay, setShowPaymentOverlay] = useState(false);
   const [selectedTokens, setSelectedTokens] = useState({ rwa: 60, sovr: 30, card: 10 });
+  const [showMixAdjustment, setShowMixAdjustment] = useState(false);
+  const [liveMetrics, setLiveMetrics] = useState<SystemMetrics | null>(null);
+  const { lastMessage } = useWebSocket('/ws');
+
+  const { data: metrics } = useQuery<SystemMetrics>({
+    queryKey: ['/api/metrics'],
+  });
+
+  useEffect(() => {
+    if (lastMessage?.type === 'metrics') {
+      setLiveMetrics(lastMessage.data);
+    }
+  }, [lastMessage]);
+
+  const currentMetrics = liveMetrics || metrics;
 
   const downloadExtension = async () => {
     try {
@@ -270,22 +289,45 @@ const processPayment = async (formData) => {
                     <CardTitle>Your Wallet</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span>RWA Tokens:</span>
-                      <span className="font-medium">$2,588.75</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>SOVR Credits:</span>
-                      <span className="font-medium">$15,420.80</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Staking Rewards:</span>
-                      <span className="font-medium text-green-500">$245.60</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Available for Spending:</span>
-                      <span className="font-bold text-primary">$18,255.15</span>
-                    </div>
+                    {currentMetrics ? (
+                      <>
+                        <div className="flex justify-between">
+                          <span>RWA Tokens:</span>
+                          <span className="font-medium">${(currentMetrics.transactionVolume * 0.01).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>SOVR Credits:</span>
+                          <span className="font-medium">${(currentMetrics.transactionVolume * 0.15).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Staking Rewards:</span>
+                          <span className="font-medium text-green-500">${(currentMetrics.transactionVolume * 0.002).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Available for Spending:</span>
+                          <span className="font-bold text-primary">${(currentMetrics.transactionVolume * 0.162).toFixed(2)}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex justify-between">
+                          <span>RWA Tokens:</span>
+                          <span className="font-medium">$0.00</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>SOVR Credits:</span>
+                          <span className="font-medium">$0.00</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Staking Rewards:</span>
+                          <span className="font-medium text-green-500">$0.00</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Available for Spending:</span>
+                          <span className="font-bold text-primary">$0.00</span>
+                        </div>
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -356,6 +398,87 @@ const processPayment = async (formData) => {
                               </div>
                             </div>
 
+                            {/* Mix Adjustment Controls */}
+                            {showMixAdjustment && (
+                              <div className="space-y-3 border-t pt-3">
+                                <div className="text-sm font-medium">Adjust Payment Mix</div>
+                                
+                                <div className="space-y-3">
+                                  <div>
+                                    <div className="flex justify-between mb-1">
+                                      <Label>RWA Tokens</Label>
+                                      <span className="text-sm">{selectedTokens.rwa}%</span>
+                                    </div>
+                                    <Slider
+                                      value={[selectedTokens.rwa]}
+                                      onValueChange={(value) => {
+                                        const newRwa = value[0];
+                                        const remaining = 100 - newRwa;
+                                        const sovrRatio = selectedTokens.sovr / (selectedTokens.sovr + selectedTokens.card);
+                                        setSelectedTokens({
+                                          rwa: newRwa,
+                                          sovr: Math.round(remaining * sovrRatio),
+                                          card: Math.round(remaining * (1 - sovrRatio))
+                                        });
+                                      }}
+                                      max={90}
+                                      step={5}
+                                      className="w-full"
+                                      data-testid="slider-rwa"
+                                    />
+                                  </div>
+                                  
+                                  <div>
+                                    <div className="flex justify-between mb-1">
+                                      <Label>SOVR Credits</Label>
+                                      <span className="text-sm">{selectedTokens.sovr}%</span>
+                                    </div>
+                                    <Slider
+                                      value={[selectedTokens.sovr]}
+                                      onValueChange={(value) => {
+                                        const newSovr = value[0];
+                                        const remaining = 100 - newSovr;
+                                        const rwaRatio = selectedTokens.rwa / (selectedTokens.rwa + selectedTokens.card);
+                                        setSelectedTokens({
+                                          rwa: Math.round(remaining * rwaRatio),
+                                          sovr: newSovr,
+                                          card: Math.round(remaining * (1 - rwaRatio))
+                                        });
+                                      }}
+                                      max={80}
+                                      step={5}
+                                      className="w-full"
+                                      data-testid="slider-sovr"
+                                    />
+                                  </div>
+                                  
+                                  <div>
+                                    <div className="flex justify-between mb-1">
+                                      <Label>Credit Card</Label>
+                                      <span className="text-sm">{selectedTokens.card}%</span>
+                                    </div>
+                                    <Slider
+                                      value={[selectedTokens.card]}
+                                      onValueChange={(value) => {
+                                        const newCard = value[0];
+                                        const remaining = 100 - newCard;
+                                        const rwaRatio = selectedTokens.rwa / (selectedTokens.rwa + selectedTokens.sovr);
+                                        setSelectedTokens({
+                                          rwa: Math.round(remaining * rwaRatio),
+                                          sovr: Math.round(remaining * (1 - rwaRatio)),
+                                          card: newCard
+                                        });
+                                      }}
+                                      max={50}
+                                      step={5}
+                                      className="w-full"
+                                      data-testid="slider-card"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
                             <div className="flex space-x-2">
                               <Button
                                 className="flex-1"
@@ -365,8 +488,13 @@ const processPayment = async (formData) => {
                                 <i className="fas fa-rocket mr-2"></i>
                                 Pay with SOVR
                               </Button>
-                              <Button variant="outline" size="sm">
-                                Adjust Mix
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => setShowMixAdjustment(!showMixAdjustment)}
+                                data-testid="adjust-mix"
+                              >
+                                {showMixAdjustment ? 'Hide Mix' : 'Adjust Mix'}
                               </Button>
                             </div>
                           </div>
