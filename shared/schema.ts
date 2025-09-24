@@ -264,3 +264,289 @@ export const notificationTemplateSchema = z.object({
 });
 
 export type NotificationTemplate = z.infer<typeof notificationTemplateSchema>;
+
+// Tokenized Asset Schema
+export const tokenizedAssetSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  symbol: z.string(),
+  description: z.string().optional(),
+  assetType: z.enum(['real_estate', 'commodity', 'stock', 'bond', 'artwork', 'collectible', 'intellectual_property']),
+  totalSupply: z.number(),
+  availableSupply: z.number(),
+  pricePerToken: z.number(),
+  currency: z.string().default('USD'),
+  
+  // Blockchain Information
+  contractAddress: z.string().optional(),
+  network: z.enum(['ethereum', 'polygon', 'bsc', 'arbitrum', 'optimism', 'testnet']),
+  tokenStandard: z.enum(['ERC20', 'ERC721', 'ERC1155']),
+  
+  // Asset Details
+  underlyingAssetValue: z.number(),
+  lastValuationDate: z.string(),
+  nextValuationDate: z.string().optional(),
+  
+  // Compliance and Legal
+  regulatoryStatus: z.enum(['compliant', 'pending', 'non_compliant']),
+  jurisdictions: z.array(z.string()),
+  complianceDocuments: z.array(z.object({
+    type: z.string(),
+    url: z.string(),
+    uploadedAt: z.string(),
+  })),
+  
+  // Trading Information
+  isListed: z.boolean().default(false),
+  tradingEnabled: z.boolean().default(false),
+  minimumInvestment: z.number().optional(),
+  
+  // Metadata
+  metadata: z.record(z.any()).optional(),
+  status: z.enum(['draft', 'pending_approval', 'active', 'suspended', 'retired']),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const insertTokenizedAssetSchema = tokenizedAssetSchema.omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  status: true,
+  contractAddress: true,
+});
+
+export type TokenizedAsset = z.infer<typeof tokenizedAssetSchema>;
+export type InsertTokenizedAsset = z.infer<typeof insertTokenizedAssetSchema>;
+
+// Asset Valuation Schema
+export const assetValuationSchema = z.object({
+  id: z.string(),
+  assetId: z.string(),
+  valuationType: z.enum(['appraisal', 'market_based', 'income_based', 'cost_based', 'automated']),
+  valuationAmount: z.number(),
+  currency: z.string().default('USD'),
+  
+  // Valuation Details
+  valuationDate: z.string(),
+  effectiveDate: z.string(),
+  expirationDate: z.string().optional(),
+  
+  // Valuation Source
+  valuatorId: z.string().optional(),
+  valuatorName: z.string().optional(),
+  valuatorLicense: z.string().optional(),
+  valuationFirm: z.string().optional(),
+  
+  // Supporting Information
+  methodology: z.string().optional(),
+  assumptions: z.array(z.string()).optional(),
+  comparables: z.array(z.object({
+    property: z.string(),
+    salePrice: z.number(),
+    saleDate: z.string(),
+    adjustments: z.record(z.number()).optional(),
+  })).optional(),
+  
+  // Market Conditions
+  marketConditions: z.object({
+    trend: z.enum(['rising', 'stable', 'declining']),
+    volatility: z.enum(['low', 'medium', 'high']),
+    liquidity: z.enum(['high', 'medium', 'low']),
+    notes: z.string().optional(),
+  }).optional(),
+  
+  // Confidence and Risk
+  confidenceLevel: z.enum(['very_high', 'high', 'medium', 'low']),
+  riskFactors: z.array(z.string()).optional(),
+  
+  // Supporting Documents
+  documents: z.array(z.object({
+    type: z.string(),
+    name: z.string(),
+    url: z.string(),
+    uploadedAt: z.string(),
+  })),
+  
+  // Approval and Status
+  status: z.enum(['draft', 'pending_review', 'approved', 'rejected', 'expired']),
+  approvedBy: z.string().optional(),
+  approvedAt: z.string().optional(),
+  rejectionReason: z.string().optional(),
+  
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const insertAssetValuationSchema = assetValuationSchema.omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  status: true,
+  approvedBy: true,
+  approvedAt: true,
+});
+
+export type AssetValuation = z.infer<typeof assetValuationSchema>;
+export type InsertAssetValuation = z.infer<typeof insertAssetValuationSchema>;
+
+// Market Price Schema
+export const marketPriceSchema = z.object({
+  id: z.string(),
+  assetId: z.string(),
+  price: z.number(),
+  currency: z.string().default('USD'),
+  
+  // Price Source
+  source: z.enum(['exchange', 'otc', 'appraisal', 'index', 'algorithmic']),
+  sourceName: z.string(),
+  sourceReliability: z.enum(['very_high', 'high', 'medium', 'low']),
+  
+  // Trading Information
+  volume: z.number().optional(),
+  volumePeriod: z.enum(['1h', '24h', '7d', '30d']).optional(),
+  lastTradeTime: z.string().optional(),
+  
+  // Price Movement
+  changeAmount: z.number().optional(),
+  changePercent: z.number().optional(),
+  changePeriod: z.enum(['1h', '24h', '7d', '30d']).optional(),
+  
+  // OHLC Data (for charting)
+  open: z.number().optional(),
+  high: z.number().optional(),
+  low: z.number().optional(),
+  close: z.number().optional(),
+  
+  // Market Context
+  marketCap: z.number().optional(),
+  circulatingSupply: z.number().optional(),
+  
+  // Technical Indicators
+  rsi: z.number().optional(), // Relative Strength Index
+  movingAverage7d: z.number().optional(),
+  movingAverage30d: z.number().optional(),
+  volatility: z.number().optional(),
+  
+  // Data Quality
+  confidence: z.enum(['very_high', 'high', 'medium', 'low']),
+  staleness: z.number().optional(), // Minutes since last update
+  
+  timestamp: z.string(),
+  createdAt: z.string(),
+});
+
+export const insertMarketPriceSchema = marketPriceSchema.omit({
+  id: true,
+  createdAt: true,
+});
+
+export type MarketPrice = z.infer<typeof marketPriceSchema>;
+export type InsertMarketPrice = z.infer<typeof insertMarketPriceSchema>;
+
+// Property Insight Schema
+export const propertyInsightSchema = z.object({
+  id: z.string(),
+  assetId: z.string(),
+  insightType: z.enum(['market_analysis', 'rental_yield', 'appreciation_forecast', 'risk_assessment', 'comparable_analysis', 'demographic_analysis', 'infrastructure_impact']),
+  title: z.string(),
+  description: z.string(),
+  
+  // Insight Data
+  keyMetrics: z.record(z.union([z.string(), z.number(), z.boolean()])),
+  
+  // Analysis Details
+  analysisMethod: z.string().optional(),
+  dataSourcesUsed: z.array(z.string()),
+  sampleSize: z.number().optional(),
+  confidenceInterval: z.number().optional(),
+  
+  // Forecast Information (if applicable)
+  forecastPeriod: z.enum(['1_month', '3_months', '6_months', '1_year', '3_years', '5_years']).optional(),
+  forecastAccuracy: z.number().optional(), // Historical accuracy percentage
+  
+  // Geographic and Market Context
+  geographicScope: z.enum(['neighborhood', 'city', 'county', 'state', 'region', 'national']),
+  marketSegment: z.string().optional(),
+  
+  // Risk and Opportunity Indicators
+  riskLevel: z.enum(['very_low', 'low', 'medium', 'high', 'very_high']),
+  opportunityScore: z.number().optional(), // 0-100 scale
+  
+  // Comparable Properties (for real estate)
+  comparables: z.array(z.object({
+    address: z.string(),
+    distance: z.number(), // in miles/km
+    similarity: z.number(), // 0-100 percentage
+    keyDifferences: z.array(z.string()),
+    adjustments: z.record(z.number()).optional(),
+  })).optional(),
+  
+  // Market Trends
+  trends: z.array(z.object({
+    indicator: z.string(),
+    currentValue: z.number(),
+    historicalValues: z.array(z.object({
+      period: z.string(),
+      value: z.number(),
+    })),
+    trend: z.enum(['increasing', 'stable', 'decreasing']),
+    significance: z.enum(['high', 'medium', 'low']),
+  })).optional(),
+  
+  // Supporting Documentation
+  charts: z.array(z.object({
+    type: z.string(),
+    title: z.string(),
+    dataUrl: z.string().optional(),
+    imageUrl: z.string().optional(),
+  })).optional(),
+  
+  reports: z.array(z.object({
+    title: z.string(),
+    format: z.enum(['pdf', 'excel', 'json']),
+    url: z.string(),
+    generatedAt: z.string(),
+  })).optional(),
+  
+  // Insight Quality
+  accuracy: z.enum(['very_high', 'high', 'medium', 'low']),
+  relevance: z.enum(['very_high', 'high', 'medium', 'low']),
+  freshnessScore: z.number().optional(), // 0-100, based on data recency
+  
+  // User Interaction
+  views: z.number().default(0),
+  bookmarks: z.number().default(0),
+  shares: z.number().default(0),
+  
+  // Automated Analysis
+  generatedBy: z.enum(['human_analyst', 'ai_model', 'hybrid']),
+  modelVersion: z.string().optional(),
+  lastUpdated: z.string(),
+  
+  // Status and Lifecycle
+  status: z.enum(['active', 'outdated', 'under_review', 'archived']),
+  publishedAt: z.string().optional(),
+  expiresAt: z.string().optional(),
+  
+  // Metadata
+  tags: z.array(z.string()),
+  metadata: z.record(z.any()).optional(),
+  
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const insertPropertyInsightSchema = propertyInsightSchema.omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  status: true,
+  views: true,
+  bookmarks: true,
+  shares: true,
+  publishedAt: true,
+});
+
+export type PropertyInsight = z.infer<typeof propertyInsightSchema>;
+export type InsertPropertyInsight = z.infer<typeof insertPropertyInsightSchema>;
