@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 
 interface ApiTestRequest {
@@ -16,27 +17,73 @@ interface ApiTestRequest {
 
 export function ApiTester() {
   const [selectedEndpoint, setSelectedEndpoint] = useState('/v1/payments');
+  const [authToken, setAuthToken] = useState('your-api-key');
   const [requestBody, setRequestBody] = useState(`{
-  "amount": 1000,
+  "amount": 2500,
   "currency": "USD",
-  "description": "Test payment",
+  "description": "Test payment from API Tester",
   "customer": {
     "email": "test@example.com"
+  },
+  "metadata": {
+    "source": "api_testing_demo",
+    "test_mode": true
   }
 }`);
+
+  const { toast } = useToast();
 
   const testApiMutation = useMutation({
     mutationFn: (data: ApiTestRequest) => apiRequest('/api/test', {
       method: 'POST',
       body: data,
     }),
+    onSuccess: (response) => {
+      if (response.responseCode >= 200 && response.responseCode < 300) {
+        toast({
+          title: "API Request Successful",
+          description: `${response.responseCode} - Request completed in ${response.responseTime}ms`,
+        });
+      } else {
+        toast({
+          title: "API Request Failed",
+          description: `${response.responseCode} - ${response.responseBody?.error || 'Request failed'}`,
+          variant: "destructive",
+        });
+      }
+    },
+    onError: () => {
+      toast({
+        title: "Request Error",
+        description: "Failed to execute API request. Please try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   const endpoints = [
-    { path: '/v1/payments', method: 'POST', description: 'Create Payment' },
+    { path: '/v1/payments', method: 'POST', description: 'Create Payment', bodyExample: `{
+  "amount": 2500,
+  "currency": "USD",
+  "description": "Test payment from API Tester",
+  "customer": {
+    "email": "test@example.com"
+  },
+  "metadata": {
+    "source": "api_testing_demo"
+  }
+}` },
     { path: '/v1/payments/{id}', method: 'GET', description: 'Get Payment' },
     { path: '/v1/transactions', method: 'GET', description: 'List Transactions' },
-    { path: '/v1/refunds', method: 'POST', description: 'Refund Payment' },
+    { path: '/v1/refunds', method: 'POST', description: 'Refund Payment', bodyExample: `{
+  "amount": 1000,
+  "currency": "USD",
+  "reason": "requested_by_customer",
+  "payment_intent": "pay_1234567890",
+  "metadata": {
+    "refund_reason": "Customer not satisfied"
+  }
+}` },
   ];
 
   const handleSendRequest = () => {
@@ -84,7 +131,12 @@ export function ApiTester() {
                       ? 'border-l-primary bg-muted/20' 
                       : 'border-l-transparent'
                   }`}
-                  onClick={() => setSelectedEndpoint(endpoint.path)}
+                  onClick={() => {
+                    setSelectedEndpoint(endpoint.path);
+                    if (endpoint.bodyExample) {
+                      setRequestBody(endpoint.bodyExample);
+                    }
+                  }}
                   data-testid={`endpoint-${endpoint.path.replace(/[^a-zA-Z0-9]/g, '-')}`}
                 >
                   <div className="flex items-center justify-between">
@@ -137,7 +189,16 @@ export function ApiTester() {
                   <span className="text-muted-foreground">https://api.sovrpay.com{selectedEndpoint}</span>
                 </div>
                 <div className="text-muted-foreground text-xs mb-2">Headers:</div>
-                <div className="text-accent text-xs mb-3">Authorization: Bearer your-api-key</div>
+                <div className="flex items-center space-x-2 mb-3">
+                  <span className="text-accent text-xs">Authorization: Bearer</span>
+                  <Input
+                    value={authToken}
+                    onChange={(e) => setAuthToken(e.target.value)}
+                    className="text-xs h-6 font-mono bg-input border-border"
+                    data-testid="input-auth-token"
+                    placeholder="your-api-key"
+                  />
+                </div>
                 {(endpoints.find(e => e.path === selectedEndpoint)?.method === 'POST') && (
                   <>
                     <div className="text-muted-foreground text-xs mb-2">Body:</div>

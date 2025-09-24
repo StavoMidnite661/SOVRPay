@@ -187,10 +187,74 @@ router.post('/api/test', async (req, res) => {
         responseBody = {
           id: 'pay_1234567890',
           status: 'completed',
-          amount: 1000,
+          amount: 2500,
           currency: 'USD',
-          created_at: new Date().toISOString(),
-          transaction_id: 'txn_abcdef123456'
+          created_at: '2024-01-15T10:30:00.000Z',
+          transaction_id: 'txn_abcdef123456',
+          customer: {
+            id: 'cust_abc123',
+            email: 'customer@example.com',
+            name: 'John Doe'
+          },
+          payment_method: {
+            type: 'card',
+            card: {
+              brand: 'mastercard',
+              last4: '1234',
+              exp_month: 8,
+              exp_year: 2026
+            }
+          }
+        };
+        break;
+      case '/v1/transactions':
+        responseBody = {
+          object: 'list',
+          data: [
+            {
+              id: 'txn_789012345',
+              type: 'payment',
+              amount: 1500,
+              currency: 'USD',
+              status: 'succeeded',
+              created: '2024-01-15T14:20:00.000Z',
+              description: 'Product purchase'
+            },
+            {
+              id: 'txn_678901234',
+              type: 'refund',
+              amount: -500,
+              currency: 'USD',
+              status: 'succeeded',
+              created: '2024-01-14T09:15:00.000Z',
+              description: 'Partial refund'
+            },
+            {
+              id: 'txn_567890123',
+              type: 'payment',
+              amount: 3200,
+              currency: 'USD',
+              status: 'pending',
+              created: '2024-01-13T16:45:00.000Z',
+              description: 'Subscription payment'
+            }
+          ],
+          has_more: false,
+          total_count: 3
+        };
+        break;
+      case '/v1/refunds':
+        responseBody = {
+          id: 'rf_' + Math.random().toString(36).substring(7),
+          amount: body?.amount || 1000,
+          currency: body?.currency || 'USD',
+          status: 'succeeded',
+          reason: body?.reason || 'requested_by_customer',
+          created: new Date().toISOString(),
+          payment_intent: body?.payment_intent || 'pay_1234567890',
+          metadata: body?.metadata || {
+            refund_reason: 'Customer not satisfied'
+          }
         };
         break;
       default:
@@ -246,5 +310,7 @@ router.get('/api/download-extension', (req, res) => {
     res.status(404).json({ error: 'Extension not available' });
   }
 });
+
+// Remove duplicate API testing endpoint - using the existing one above
 
 export { router };
