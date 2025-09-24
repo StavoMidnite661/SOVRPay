@@ -197,13 +197,9 @@ export const transactionReceiptSchema = z.object({
 });
 
 export const createTransactionReceiptSchema = transactionReceiptSchema.omit({
-  id: true,
-  receiptNumber: true,
   status: true,
-  generatedAt: true,
   sentAt: true,
   deliveredAt: true,
-  immutableReference: true,
 });
 
 export type TransactionReceipt = z.infer<typeof transactionReceiptSchema>;

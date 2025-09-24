@@ -311,6 +311,102 @@ router.get('/api/download-extension', (req, res) => {
   }
 });
 
-// Remove duplicate API testing endpoint - using the existing one above
+// Transaction Receipt Routes - Production-ready notification system
+// Referenced from receiptService integration
+
+// Generate and send receipt for any transaction
+router.post('/api/receipts/generate', async (req, res) => {
+  try {
+    const { receiptService } = await import('./receiptService');
+    const { transactionType, transactionId, userId, userEmail, transactionData } = req.body;
+    
+    // Create receipt generation context
+    const context = {
+      transactionType,
+      transactionId,
+      userId,
+      userEmail,
+      transactionData,
+    };
+    
+    // Generate comprehensive receipt
+    const receipt = await receiptService.generateReceipt(context);
+    
+    // Save receipt to storage (preserving existing ID and receipt number)
+    const savedReceipt = await storage.saveTransactionReceipt(receipt);
+    
+    // Get user notification preferences
+    let userPreferences = await storage.getUserNotificationPreferences(userId);
+    
+    // Create default preferences if none exist
+    if (!userPreferences) {
+      userPreferences = await storage.saveUserNotificationPreferences({
+        userId,
+        email: userEmail,
+        enableEmailReceipts: true,
+        enableSMSAlerts: false,
+        enableInAppNotifications: true,
+        timezone: 'UTC',
+        language: 'en',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    }
+    
+    // Send notifications directly to user account
+    const finalReceipt = await receiptService.sendReceiptNotifications(savedReceipt, userPreferences);
+    
+    // Update receipt status in storage
+    await storage.updateReceiptStatus(
+      finalReceipt.id, 
+      finalReceipt.status, 
+      finalReceipt.notificationHistory
+    );
+    
+    res.json({
+      success: true,
+      receipt: finalReceipt,
+      message: 'Receipt generated and notifications sent successfully'
+    });
+    
+  } catch (error) {
+    console.error('Receipt generation failed:', error);
+    res.status(500).json({ 
+      error: 'Failed to generate receipt',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Get user's receipt history
+router.get('/api/receipts/user/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const receipts = await storage.getTransactionReceiptsByUser(userId);
+    
+    res.json({
+      receipts,
+      totalCount: receipts.length
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch receipts' });
+  }
+});
+
+// Get specific receipt
+router.get('/api/receipts/:receiptId', async (req, res) => {
+  try {
+    const { receiptId } = req.params;
+    const receipt = await storage.getTransactionReceipt(receiptId);
+    
+    if (!receipt) {
+      return res.status(404).json({ error: 'Receipt not found' });
+    }
+    
+    res.json(receipt);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch receipt' });
+  }
+});
 
 export { router };

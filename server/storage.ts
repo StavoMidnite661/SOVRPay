@@ -1,4 +1,14 @@
-import { Payment, SmartContract, Transaction, ApiRequest, SystemMetrics, GeographicData } from '@shared/schema';
+import { 
+  Payment, 
+  SmartContract, 
+  Transaction, 
+  ApiRequest, 
+  SystemMetrics, 
+  GeographicData,
+  TransactionReceipt,
+  UserNotificationPreferences,
+  TransactionEvent
+} from '@shared/schema';
 
 export interface IStorage {
   // Payments
@@ -19,6 +29,22 @@ export interface IStorage {
 
   // API Requests (for testing/logging)
   logApiRequest(request: Omit<ApiRequest, 'id'>): Promise<ApiRequest>;
+  
+  // Receipt and Notification Management
+  saveTransactionReceipt(receipt: Omit<TransactionReceipt, 'id'>): Promise<TransactionReceipt>;
+  getTransactionReceipt(receiptId: string): Promise<TransactionReceipt | null>;
+  getTransactionReceiptsByUser(userId: string): Promise<TransactionReceipt[]>;
+  updateReceiptStatus(receiptId: string, status: string, notificationHistory?: any[]): Promise<void>;
+  
+  // User Notification Preferences
+  saveUserNotificationPreferences(preferences: Omit<UserNotificationPreferences, 'id'>): Promise<UserNotificationPreferences>;
+  getUserNotificationPreferences(userId: string): Promise<UserNotificationPreferences | null>;
+  updateUserNotificationPreferences(userId: string, updates: Partial<UserNotificationPreferences>): Promise<void>;
+  
+  // Transaction Events for Receipt Generation
+  createTransactionEvent(event: Omit<TransactionEvent, 'id'>): Promise<TransactionEvent>;
+  getUnprocessedTransactionEvents(): Promise<TransactionEvent[]>;
+  markTransactionEventProcessed(eventId: string): Promise<void>;
   getApiRequests(limit?: number): Promise<ApiRequest[]>;
 
   // System Metrics
@@ -34,6 +60,9 @@ class MemStorage implements IStorage {
   private smartContracts: SmartContract[] = [];
   private transactions: Transaction[] = [];
   private apiRequests: ApiRequest[] = [];
+  private transactionReceipts: TransactionReceipt[] = [];
+  private userNotificationPreferences: UserNotificationPreferences[] = [];
+  private transactionEvents: TransactionEvent[] = [];
   private systemMetrics: SystemMetrics = {
     transactionVolume: 2400000,
     successRate: 98.7,
@@ -170,6 +199,79 @@ class MemStorage implements IStorage {
 
   async getGeographicData(): Promise<GeographicData[]> {
     return this.geographicData;
+  }
+
+  // Receipt Management Implementation
+  async saveTransactionReceipt(receipt: TransactionReceipt): Promise<TransactionReceipt> {
+    // Preserve the existing ID to maintain consistency with immutable references
+    this.transactionReceipts.push(receipt);
+    return receipt;
+  }
+
+  async getTransactionReceipt(receiptId: string): Promise<TransactionReceipt | null> {
+    return this.transactionReceipts.find(r => r.id === receiptId) || null;
+  }
+
+  async getTransactionReceiptsByUser(userId: string): Promise<TransactionReceipt[]> {
+    return this.transactionReceipts.filter(r => r.userId === userId);
+  }
+
+  async updateReceiptStatus(receiptId: string, status: string, notificationHistory?: any[]): Promise<void> {
+    const receipt = this.transactionReceipts.find(r => r.id === receiptId);
+    if (receipt) {
+      receipt.status = status as any;
+      if (notificationHistory) {
+        receipt.notificationHistory = notificationHistory;
+      }
+      if (status === 'sent') {
+        receipt.sentAt = new Date().toISOString();
+      }
+      if (status === 'delivered') {
+        receipt.deliveredAt = new Date().toISOString();
+      }
+    }
+  }
+
+  // User Notification Preferences Implementation
+  async saveUserNotificationPreferences(preferences: Omit<UserNotificationPreferences, 'id'>): Promise<UserNotificationPreferences> {
+    const newPreferences: UserNotificationPreferences = {
+      ...preferences,
+    };
+    this.userNotificationPreferences.push(newPreferences);
+    return newPreferences;
+  }
+
+  async getUserNotificationPreferences(userId: string): Promise<UserNotificationPreferences | null> {
+    return this.userNotificationPreferences.find(p => p.userId === userId) || null;
+  }
+
+  async updateUserNotificationPreferences(userId: string, updates: Partial<UserNotificationPreferences>): Promise<void> {
+    const preferences = this.userNotificationPreferences.find(p => p.userId === userId);
+    if (preferences) {
+      Object.assign(preferences, updates);
+      preferences.updatedAt = new Date().toISOString();
+    }
+  }
+
+  // Transaction Events Implementation
+  async createTransactionEvent(event: Omit<TransactionEvent, 'id'>): Promise<TransactionEvent> {
+    const newEvent: TransactionEvent = {
+      ...event,
+      id: `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    };
+    this.transactionEvents.push(newEvent);
+    return newEvent;
+  }
+
+  async getUnprocessedTransactionEvents(): Promise<TransactionEvent[]> {
+    return this.transactionEvents.filter(e => !e.processedAt);
+  }
+
+  async markTransactionEventProcessed(eventId: string): Promise<void> {
+    const event = this.transactionEvents.find(e => e.id === eventId);
+    if (event) {
+      event.processedAt = new Date().toISOString();
+    }
   }
 }
 

@@ -39,7 +39,7 @@ export class TransactionReceiptService {
     const timestamp = new Date().toISOString();
     
     // Create receipt content based on transaction type
-    const receiptContent = await this.createReceiptContent(context);
+    const receiptContent = await this.createReceiptContent(context, receiptNumber);
     
     // Generate immutable reference for integrity verification
     const immutableReference = this.generateImmutableReference(receiptContent);
@@ -151,9 +151,9 @@ export class TransactionReceiptService {
   /**
    * Create receipt content based on transaction type
    */
-  private async createReceiptContent(context: ReceiptGenerationContext): Promise<any> {
+  private async createReceiptContent(context: ReceiptGenerationContext, receiptNumber: string): Promise<any> {
     const baseContent = {
-      receiptNumber: this.generateReceiptNumber(),
+      receiptNumber,
       timestamp: new Date().toISOString(),
       transactionType: context.transactionType,
       transactionId: context.transactionId,
