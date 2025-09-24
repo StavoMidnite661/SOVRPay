@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export function IntegrationHub() {
   const [selectedIntegration, setSelectedIntegration] = useState<string | null>(null);
+  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
 
   const integrationMethods = [
     {
@@ -324,7 +325,16 @@ await whiteLabel.deploy();`
                 <h3 className="text-xl font-semibold mb-4">{category.category}</h3>
                 <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-4">
                   {category.platforms.map((platform) => (
-                    <Card key={platform.name} className="text-center">
+                    <Card 
+                      key={platform.name} 
+                      className={`text-center cursor-pointer transition-colors ${
+                        selectedPlatform === platform.name
+                          ? 'border-primary'
+                          : 'border-border hover:border-primary'
+                      }`}
+                      onClick={() => setSelectedPlatform(selectedPlatform === platform.name ? null : platform.name)}
+                      data-testid={`platform-${platform.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`}
+                    >
                       <CardContent className="p-4">
                         <i className={`${platform.icon} text-2xl text-primary mb-2`}></i>
                         <h4 className="font-medium text-sm mb-2">{platform.name}</h4>
@@ -342,6 +352,24 @@ await whiteLabel.deploy();`
                         <div className="text-xs text-muted-foreground">
                           {platform.integrations.toLocaleString()} integrations
                         </div>
+                        {selectedPlatform === platform.name && (
+                          <div className="mt-3 pt-3 border-t">
+                            <div className="space-y-2 text-xs">
+                              <div className="flex justify-between">
+                                <span>Documentation:</span>
+                                <Button variant="ghost" size="sm" className="h-5 px-2 text-xs">View</Button>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>SDK Download:</span>
+                                <Button variant="ghost" size="sm" className="h-5 px-2 text-xs">Get SDK</Button>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>API Reference:</span>
+                                <Button variant="ghost" size="sm" className="h-5 px-2 text-xs">View API</Button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   ))}
@@ -359,7 +387,15 @@ await whiteLabel.deploy();`
                       <CardTitle>
                         {integrationMethods.find(m => m.id === key)?.name} Example
                       </CardTitle>
-                      <Button variant="ghost" size="sm">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(code);
+                          // Show toast notification (if toast system is available)
+                        }}
+                        data-testid={`copy-code-${key}`}
+                      >
                         <i className="fas fa-copy text-xs"></i>
                       </Button>
                     </div>
