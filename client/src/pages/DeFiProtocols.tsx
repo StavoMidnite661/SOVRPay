@@ -1,15 +1,36 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useWebSocket } from '@/hooks/useWebSocket';
+import type { SystemMetrics } from '@shared/schema';
 
 export function DeFiProtocols() {
   const [selectedProtocol, setSelectedProtocol] = useState<string | null>(null);
   const [stakeAmount, setStakeAmount] = useState('');
   const [poolSelection, setPoolSelection] = useState('');
+  const [showLiquidityModal, setShowLiquidityModal] = useState(false);
+  const [selectedPool, setSelectedPool] = useState<string | null>(null);
+  const [liquidityAmount, setLiquidityAmount] = useState('');
+  const [liveMetrics, setLiveMetrics] = useState<SystemMetrics | null>(null);
+  const { lastMessage } = useWebSocket('/ws');
+
+  const { data: metrics } = useQuery<SystemMetrics>({
+    queryKey: ['/api/metrics'],
+  });
+
+  useEffect(() => {
+    if (lastMessage?.type === 'metrics') {
+      setLiveMetrics(lastMessage.data);
+    }
+  }, [lastMessage]);
+
+  const currentMetrics = liveMetrics || metrics;
 
   const defiProtocols = [
     {
@@ -58,33 +79,62 @@ export function DeFiProtocols() {
     }
   ];
 
-  const liquidityPools = [
+  const liquidityPools = currentMetrics ? [
     {
       name: 'SOVR/ETH',
-      apy: '15.2%',
-      tvl: '$12.3M',
-      volume24h: '$2.1M',
+      apy: `${(currentMetrics.successRate * 0.15).toFixed(1)}%`,
+      tvl: `$${(currentMetrics.transactionVolume * 0.012).toFixed(1)}M`,
+      volume24h: `$${(currentMetrics.transactionVolume * 0.002).toFixed(1)}M`,
       fees: '0.3%'
     },
     {
       name: 'RWA-RE/USDC',
-      apy: '11.8%',
-      tvl: '$8.7M',
-      volume24h: '$890K',
+      apy: `${(currentMetrics.successRate * 0.12).toFixed(1)}%`,
+      tvl: `$${(currentMetrics.transactionVolume * 0.009).toFixed(1)}M`,
+      volume24h: `$${(currentMetrics.transactionVolume * 0.0009).toFixed(0)}K`,
       fees: '0.25%'
     },
     {
       name: 'RWA-GOLD/DAI',
-      apy: '9.4%',
-      tvl: '$15.6M',
-      volume24h: '$1.2M',
+      apy: `${(currentMetrics.successRate * 0.09).toFixed(1)}%`,
+      tvl: `$${(currentMetrics.transactionVolume * 0.016).toFixed(1)}M`,
+      volume24h: `$${(currentMetrics.transactionVolume * 0.0012).toFixed(1)}M`,
       fees: '0.2%'
     },
     {
       name: 'SOVR/USDT',
-      apy: '13.7%',
-      tvl: '$19.4M',
-      volume24h: '$3.4M',
+      apy: `${(currentMetrics.successRate * 0.14).toFixed(1)}%`,
+      tvl: `$${(currentMetrics.transactionVolume * 0.019).toFixed(1)}M`,
+      volume24h: `$${(currentMetrics.transactionVolume * 0.0034).toFixed(1)}M`,
+      fees: '0.3%'
+    }
+  ] : [
+    {
+      name: 'SOVR/ETH',
+      apy: '0.0%',
+      tvl: '$0.0M',
+      volume24h: '$0.0M',
+      fees: '0.3%'
+    },
+    {
+      name: 'RWA-RE/USDC',
+      apy: '0.0%',
+      tvl: '$0.0M',
+      volume24h: '$0K',
+      fees: '0.25%'
+    },
+    {
+      name: 'RWA-GOLD/DAI',
+      apy: '0.0%',
+      tvl: '$0.0M',
+      volume24h: '$0.0M',
+      fees: '0.2%'
+    },
+    {
+      name: 'SOVR/USDT',
+      apy: '0.0%',
+      tvl: '$0.0M',
+      volume24h: '$0.0M',
       fees: '0.3%'
     }
   ];
@@ -284,9 +334,81 @@ export function DeFiProtocols() {
                         <span className="font-medium ml-2">0.00%</span>
                       </div>
                     </div>
-                    <Button className="w-full mt-3" size="sm">
-                      Add Liquidity
-                    </Button>
+                    <Dialog open={showLiquidityModal && selectedPool === pool.name} onOpenChange={(open) => {
+                      setShowLiquidityModal(open);
+                      if (!open) setSelectedPool(null);
+                    }}>
+                      <DialogTrigger asChild>
+                        <Button 
+                          className="w-full mt-3" 
+                          size="sm"
+                          onClick={() => {
+                            setSelectedPool(pool.name);
+                            setShowLiquidityModal(true);
+                          }}
+                          data-testid={`add-liquidity-${pool.name.toLowerCase().replace('/', '-')}`}
+                        >
+                          Add Liquidity
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Add Liquidity to {pool.name}</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <Label htmlFor="liquidity-amount">Amount</Label>
+                            <Input
+                              id="liquidity-amount"
+                              placeholder="Enter amount"
+                              value={liquidityAmount}
+                              onChange={(e) => setLiquidityAmount(e.target.value)}
+                              data-testid="input-liquidity-amount"
+                            />
+                          </div>
+                          <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                              <span>Pool APY:</span>
+                              <span className="font-medium text-green-500">{pool.apy}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Pool TVL:</span>
+                              <span className="font-medium">{pool.tvl}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Pool Fees:</span>
+                              <span className="font-medium">{pool.fees}</span>
+                            </div>
+                          </div>
+                          <div className="flex space-x-2">
+                            <Button 
+                              className="flex-1" 
+                              onClick={() => {
+                                // Simulate liquidity addition
+                                setShowLiquidityModal(false);
+                                setSelectedPool(null);
+                                setLiquidityAmount('');
+                              }}
+                              data-testid="button-confirm-liquidity"
+                            >
+                              Confirm
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              className="flex-1"
+                              onClick={() => {
+                                setShowLiquidityModal(false);
+                                setSelectedPool(null);
+                                setLiquidityAmount('');
+                              }}
+                              data-testid="button-cancel-liquidity"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   </CardContent>
                 </Card>
               ))}
