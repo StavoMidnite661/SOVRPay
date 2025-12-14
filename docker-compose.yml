@@ -1,0 +1,11 @@
+# Quick start:
+# cp .env.example .env
+# Edit .env with your API keys
+# docker-compose up -d
+# App runs at http://localhost:5000
+# Includes:
+
+# PostgreSQL 14 with automatic pgcrypto extension
+# SOVR Pay application
+# Health checks and auto-restart
+# Network isolation

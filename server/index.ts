@@ -1,3 +1,4 @@
+
 import express from 'express';
 import { createServer } from 'http';
 import { router, setupWebSocket } from './routes';
@@ -13,6 +14,8 @@ setupWebSocket(server);
 
 setupVite(app, server);
 
-server.listen(5000, () => {
-  // SOVR Pay Platform is running
+const port = process.env.PORT || 5001;
+
+server.listen(port, () => {
+  console.log(`SOVR Pay Platform is running on port ${port}`);
 });
