@@ -1,154 +1,84 @@
-📋 What I've Created
-1. Complete Database Schema (server/db/schema.ts)
-13 production-ready PostgreSQL tables
-Full support for payments, smart contracts, RWA tokenization, asset management, and shopping
-Proper indexes, foreign keys, and constraints
-2. Comprehensive Documentation
-SETUP.md - Complete setup guide with:
+# SOVR Pay Network Suite
 
-Database setup (Local PostgreSQL, AWS RDS, Neon, Supabase)
-All required and optional API keys
-Installation steps
-Deployment options (Vercel, AWS EC2, Docker)
-Troubleshooting guide
-LOCAL_SETUP.md - Local development guide:
+SOVR Pay is a comprehensive financial technology platform designed to bridge the gap between traditional finance and the decentralized, digital economy. It functions as a complete ecosystem for tokenizing real-world assets (RWAs), processing complex payments, and managing digital financial operations.
 
-How to modify environment variables (3 methods)
-Minimum required setup
-Complete PostgreSQL local setup
-API key setup instructions
-Testing guide
-DATABASE_SCHEMA.md - Complete schema reference:
+## Features
 
-All 13 tables with SQL definitions
-Relationships and indexes
-Migration commands
-Performance optimization tips
-DATABASE_MIGRATION_GUIDE.md - Migration instructions:
+*   **Tokenize Real-World Assets:** Convert physical or traditional assets (like real estate, art, commodities, and bonds) into tradable digital tokens on a blockchain.
+*   **Process Mixed-Asset Payments:** Enable seamless real-world shopping experiences where users can pay with a combination of RWA tokens, SOVR credits (the native platform currency), and traditional fiat currency.
+*   **Integrate with Existing Systems:** Provide developers with robust REST APIs, SDKs, and Webhooks to connect e-commerce platforms, financial applications, and business tools to the SOVR Pay network.
+*   **Universal Payments:** Offer a browser extension that injects payment options onto any website's checkout form, allowing users to spend their digital assets anywhere, even without direct merchant integration.
+*   **Manage Compliance:** Handle complex banking and regulatory requirements, including KYC/AML checks and ISO 20022 messaging for cross-border payments.
+*   **Monitor the Ecosystem:** Provide a real-time command center to monitor system health, transaction volume, market prices, and other key metrics across the entire platform.
 
-Current vs. production architecture
-Step-by-step migration from in-memory to persistent storage
-Decimal/number type handling
-UpdatedAt timestamp strategies
-3. Docker Setup (Easiest Way to Run Locally!)
-docker-compose.yml - Complete stack:
+## Getting Started
 
-# Quick start:
-cp .env.example .env
-# Edit .env with your API keys
-docker-compose up -d
-# App runs at http://localhost:5000
-Includes:
+### Prerequisites
 
-PostgreSQL 14 with automatic pgcrypto extension
-SOVR Pay application
-Health checks and auto-restart
-Network isolation
-4. Environment Variables
-.env.example updated with all required APIs:
+*   [Node.js](https://nodejs.org/en/) (v18 or later)
+*   [pnpm](https://pnpm.io/)
+*   [Docker](https://www.docker.com/)
 
-Critical (Must Have):
+### Installation
 
-DATABASE_URL - PostgreSQL connection
-SENDGRID_API_KEY - Email delivery
-STRIPE_SECRET_KEY - Payments
-ALCHEMY_API_KEY - Blockchain
-Important:
+1.  **Clone the repository:**
 
-GOOGLE_API_KEY - Gemini AI for asset analysis
-TWILIO_* - SMS notifications
-Optional (Shopping Features):
+    ```bash
+    git clone https://github.com/StavoMidnite661/SOVRPay.git
+    cd SOVRPay
+    ```
 
-BESTBUY_API_KEY - Best Buy products
-SERPER_API_KEY - Google Shopping
-REDCIRCLE_API_KEY - Target products
-🚀 How to Modify Environment Variables Locally
-Method 1: .env File (Recommended)
-cp .env.example .env
-nano .env  # Edit with your values
-npm run dev
-Method 2: Replit Secrets
-Click "Secrets" tab (🔒 icon)
-Add key-value pairs
-Restart application
-Method 3: Command Line
-DATABASE_URL="postgresql://..." STRIPE_SECRET_KEY="sk_test_..." npm run dev
-📊 Complete Database Map
-Core Tables
-payments - Payment transactions
-smart_contracts - Deployed contracts
-transactions - Blockchain records
-api_requests - API logs
-Asset Management
-tokenized_assets - RWA tokens
-asset_valuations - Valuations
-market_prices - Pricing data
-property_insights - AI insights
-User & Notifications
-user_notification_preferences - User settings
-transaction_receipts - Digital receipts
-transaction_events - Event queue
-notification_templates - Templates
-Shopping
-products - Cached product data
-🔌 Required Services/Servers
-Must Install:
-Node.js v18+ (Runtime)
-PostgreSQL v14+ (Database)
-npm (Package manager)
-Must Configure:
-SendGrid - Email delivery (free tier available)
-Stripe - Payment processing (test keys free)
-Alchemy - Blockchain RPC (free tier available)
-Optional:
-Twilio - SMS notifications
-Google AI - Asset analysis
-Shopping APIs - Best Buy, Serper, RedCircle
-📦 Quickest Setup (Docker)
-# 1. Copy environment file
-cp .env.example .env
-# 2. Add your API keys to .env
-nano .env
-# 3. Start everything
-docker-compose up -d
-# 4. Run migrations
-docker-compose exec app npm run db:push
-# 5. Open browser
-# http://localhost:5000
-☁️ AWS/Production Setup
-AWS RDS PostgreSQL:
+2.  **Install dependencies:**
 
-Create RDS instance (PostgreSQL 14+)
-Enable extensions: pgcrypto, uuid-ossp
-Copy connection string
-AWS EC2 (Optional):
+    ```bash
+    pnpm install
+    ```
 
-Launch Ubuntu 22.04 instance
-Install Node.js and PM2
-Clone repo and configure .env
-Run with PM2
-Environment Variables:
+3.  **Set up environment variables:**
 
-All variables from .env.example
-Use production API keys (not test keys)
-⚠️ Important Notes
-Current Setup: The app currently uses in-memory storage (data lost on restart)
+    Create a `.env` file in the root of the project and add the necessary environment variables. You can use the `.env.example` file as a template.
 
-For Production: Follow DATABASE_MIGRATION_GUIDE.md to enable persistent storage
+    ```bash
+    cp .env.example .env
+    ```
 
-Database Extensions: Always enable these first:
+4.  **Set up the database:**
 
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-Type Handling: PostgreSQL decimals return as strings - see migration guide for solutions
+    The project uses PostgreSQL for the database. You can use Docker to run a local instance.
 
-✅ Self-Sustaining Checklist
-✅ Complete database schema (13 tables)
-✅ All setup documentation
-✅ Docker compose configuration
-✅ Environment variable templates
-✅ API key documentation
-✅ Migration guides
-✅ Troubleshooting guides
-✅ Multiple deployment options
-Everything is ready to unpack, load dependencies (npm install), configure API keys, and run!
+    ```bash
+    docker-compose up -d
+    ```
+
+    Once the database is running, you need to apply the schema.
+
+    ```bash
+    pnpm drizzle-kit generate
+    pnpm drizzle-kit migrate
+    ```
+
+5.  **Run the application:**
+
+    ```bash
+    pnpm dev
+    ```
+
+    The application will be available at `http://localhost:5173`.
+
+## Deployment
+
+The SOVR Pay Network Suite can be deployed to various platforms, including:
+
+*   **Vercel**
+*   **AWS EC2**
+*   **Docker**
+
+Detailed deployment guides for each platform will be available soon.
+
+## Contributing
+
+Contributions are welcome! Please read our [contributing guidelines](CONTRIBUTING.md) to get started.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
